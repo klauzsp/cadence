@@ -14,8 +14,12 @@ export default function Home() {
             <span>Attract capital</span>
           </h1>
           <p className="hero-text">
-            Create permissionless, transparent investment strategies strategies
-            on Monad.
+            Investment strategies have traditionally been restrictive.
+            Institutions decide which products get created, platforms decide
+            which products get listed, and most investors can only choose from
+            the finished menu. Not with Cadence. Anyone can create
+            permissionless, transparent investment strategies strategies on
+            Monad.
           </p>
         </div>
         <CreateStrategyForm />
