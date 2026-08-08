@@ -1,21 +1,10 @@
-import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { AppNav } from "@/components/app-nav";
 import { CreateStrategyForm } from "@/components/create-strategy-form";
 
 export default function Home() {
   return (
     <main>
-      <nav>
-        <a className="wordmark" href="#top" aria-label="Cadence home">
-          <span className="mark">C</span>
-          cadence
-        </a>
-        <div className="nav-right">
-          <span className="network-status">
-            <i /> Monad testnet
-          </span>
-          <ConnectButton chainStatus="icon" showBalance={false} />
-        </div>
-      </nav>
+      <AppNav />
 
       <section className="hero" id="top">
         <div className="hero-copy">

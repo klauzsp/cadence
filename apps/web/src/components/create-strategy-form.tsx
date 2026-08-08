@@ -1,23 +1,21 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, type FormEvent } from "react";
-import { encodeAbiParameters, isAddress, parseUnits, type Address } from "viem";
-import {
-  useAccount,
-  useReadContract,
-  useWaitForTransactionReceipt,
-  useWriteContract,
-} from "wagmi";
+import { decodeEventLog, encodeAbiParameters, isAddress, parseUnits, type Address } from "viem";
+import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import {
   dcaConfigParameters,
   dcaStrategyId,
-  erc20MetadataAbi,
+  isDemoMode,
   supportedTokens,
+  tokenDetails,
   vaultFactoryAbi,
   vaultFactoryAddress,
 } from "@/lib/contracts";
 
 const frequencies = [
+  { label: "Every minute (demo)", seconds: 60 },
   { label: "Every hour", seconds: 3_600 },
   { label: "Every day", seconds: 86_400 },
   { label: "Every week", seconds: 604_800 },
@@ -25,26 +23,21 @@ const frequencies = [
 
 export function CreateStrategyForm() {
   const { isConnected } = useAccount();
+  const { address: account } = useAccount();
+  const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
   const [asset, setAsset] = useState<Address>(supportedTokens[0].address);
   const [target, setTarget] = useState<Address>(supportedTokens[2].address);
   const [amount, setAmount] = useState("");
-  const [frequency, setFrequency] = useState(frequencies[1].seconds);
+  const [frequency, setFrequency] = useState(frequencies[isDemoMode ? 0 : 2].seconds);
   const [maxSlippage, setMaxSlippage] = useState("1");
   const [name, setName] = useState("My DCA Strategy");
   const [symbol, setSymbol] = useState("DCA");
+  const [isPending, setIsPending] = useState(false);
+  const [error, setError] = useState<string>();
+  const [createdVault, setCreatedVault] = useState<Address>();
 
-  const assetAddress = isAddress(asset) ? asset : undefined;
-  const { data: decimals } = useReadContract({
-    address: assetAddress,
-    abi: erc20MetadataAbi,
-    functionName: "decimals",
-    query: { enabled: Boolean(assetAddress) },
-  });
-
-  const { data: hash, error, isPending, writeContract } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
-    hash,
-  });
+  const decimals = tokenDetails(asset)?.decimals;
 
   const canSubmit = useMemo(
     () =>
@@ -62,9 +55,13 @@ export function CreateStrategyForm() {
     [amount, asset, decimals, isConnected, maxSlippage, name, symbol, target],
   );
 
-  function createStrategy(event: FormEvent<HTMLFormElement>) {
+  async function createStrategy(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canSubmit || !vaultFactoryAddress || decimals === undefined) return;
+    if (!canSubmit || !vaultFactoryAddress || decimals === undefined || !account || !publicClient || !walletClient) return;
+
+    setIsPending(true);
+    setError(undefined);
+    setCreatedVault(undefined);
 
     const initData = encodeAbiParameters(dcaConfigParameters, [
       asset as Address,
@@ -76,12 +73,41 @@ export function CreateStrategyForm() {
       symbol,
     ]);
 
-    writeContract({
-      address: vaultFactoryAddress,
-      abi: vaultFactoryAbi,
-      functionName: "createVault",
-      args: [dcaStrategyId, initData],
-    });
+    try {
+      const { request } = await publicClient.simulateContract({
+        account,
+        address: vaultFactoryAddress,
+        abi: vaultFactoryAbi,
+        functionName: "createVault",
+        args: [dcaStrategyId, initData],
+      });
+      const estimate = await publicClient.estimateContractGas(request);
+      const hash = await walletClient.writeContract({
+        ...request,
+        gas: estimate + estimate / 10n,
+      });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+      for (const log of receipt.logs) {
+        try {
+          const decoded = decodeEventLog({
+            abi: vaultFactoryAbi,
+            data: log.data,
+            topics: log.topics,
+          });
+          if (decoded.eventName === "VaultCreated") {
+            setCreatedVault(decoded.args.vault);
+            break;
+          }
+        } catch {
+          // The transaction also contains constructor events from the new vault.
+        }
+      }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Strategy creation failed");
+    } finally {
+      setIsPending(false);
+    }
   }
 
   return (
@@ -176,17 +202,19 @@ export function CreateStrategyForm() {
         </p>
       )}
       <p className="form-note">Supported assets: USDC, wrapped MON, and wrapped ETH.</p>
-      {error && <p className="form-error">{error.message}</p>}
-      {isSuccess && <p className="form-success">Strategy created on Monad testnet.</p>}
+      {error && <p className="form-error">{error}</p>}
+      {createdVault && (
+        <p className="form-success">
+          Strategy created. <Link href={`/vaults/${createdVault}`}>Open its dashboard →</Link>
+        </p>
+      )}
 
-      <button className="submit-button" disabled={!canSubmit || isPending || isConfirming}>
+      <button className="submit-button" disabled={!canSubmit || isPending}>
         {!isConnected
           ? "Connect wallet to continue"
           : isPending
             ? "Confirm in wallet…"
-            : isConfirming
-              ? "Creating strategy…"
-              : "Create DCA strategy"}
+            : "Create DCA strategy"}
       </button>
     </form>
   );

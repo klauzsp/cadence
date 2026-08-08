@@ -9,14 +9,41 @@ import {
   type Hex,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { monadTestnet } from "viem/chains";
-import { dcaVaultAbi, erc20Abi, vaultFactoryAbi } from "./abis.js";
+import { monad, monadTestnet } from "viem/chains";
+import {
+  chainlinkFeedAbi,
+  dcaVaultAbi,
+  demoFeedAbi,
+  erc20Abi,
+  vaultFactoryAbi,
+} from "./abis.js";
 
 const rpcUrl = requiredEnv("MONAD_RPC_URL");
 const privateKey = requiredEnv("KEEPER_PRIVATE_KEY") as Hex;
 const factoryAddress = requiredAddress("VAULT_FACTORY_ADDRESS");
 const pollIntervalMs = Number(process.env.POLL_INTERVAL_MS ?? "15000");
 const dcaStrategyId = keccak256(toBytes("DCA_V1"));
+const mainnetClient = createPublicClient({
+  chain: monad,
+  transport: http(process.env.MONAD_MAINNET_RPC_URL ?? "https://rpc.monad.xyz"),
+});
+const priceFeeds = [
+  {
+    symbol: "MON/USD",
+    source: addressEnv("SOURCE_MON_USD_FEED", "0xBcD78f76005B7515837af6b50c7C52BCf73822fb"),
+    destination: requiredAddress("TESTNET_MON_USD_FEED"),
+  },
+  {
+    symbol: "ETH/USD",
+    source: addressEnv("SOURCE_ETH_USD_FEED", "0x1B1414782B859871781bA3E4B0979b9ca57A0A04"),
+    destination: requiredAddress("TESTNET_ETH_USD_FEED"),
+  },
+  {
+    symbol: "USDC/USD",
+    source: addressEnv("SOURCE_USDC_USD_FEED", "0xf5F15f188AbCB0d165D1Edb7f37F7d6fA2fCebec"),
+    destination: requiredAddress("TESTNET_USDC_USD_FEED"),
+  },
+] as const;
 
 if (!/^0x[0-9a-fA-F]{64}$/.test(privateKey)) {
   throw new Error("KEEPER_PRIVATE_KEY must be a 32-byte 0x-prefixed private key");
@@ -38,16 +65,58 @@ process.on("SIGTERM", () => {
   running = false;
 });
 
-console.log(`Keeper ${account.address} watching factory ${factoryAddress}`);
+console.log(`Keeper ${account.address} relaying Chainlink prices and watching factory ${factoryAddress}`);
 
 while (running) {
   try {
+    await relayPrices();
+  } catch (error) {
+    console.error("Price relay failed", error);
+  }
+
+  try {
     await processDueVaults();
   } catch (error) {
-    console.error("Keeper poll failed", error);
+    console.error("Vault poll failed", error);
   }
 
   if (running) await delay(pollIntervalMs);
+}
+
+async function relayPrices() {
+  for (const feed of priceFeeds) {
+    const [sourceRound, destinationRound] = await Promise.all([
+      mainnetClient.readContract({
+        address: feed.source,
+        abi: chainlinkFeedAbi,
+        functionName: "latestRoundData",
+      }),
+      publicClient.readContract({
+        address: feed.destination,
+        abi: demoFeedAbi,
+        functionName: "latestRoundData",
+      }),
+    ]);
+
+    const [, answer, , sourceUpdatedAt] = sourceRound;
+    const [, , , destinationUpdatedAt] = destinationRound;
+    if (answer <= 0n || sourceUpdatedAt <= destinationUpdatedAt) continue;
+
+    const { request } = await publicClient.simulateContract({
+      account,
+      address: feed.destination,
+      abi: demoFeedAbi,
+      functionName: "updateAnswer",
+      args: [answer, sourceUpdatedAt],
+    });
+    const estimatedGas = await publicClient.estimateContractGas(request);
+    const hash = await walletClient.writeContract({
+      ...request,
+      gas: estimatedGas + estimatedGas / 10n,
+    });
+    await publicClient.waitForTransactionReceipt({ hash });
+    console.log(`Relayed ${feed.symbol}: ${answer} (${hash})`);
+  }
 }
 
 async function processDueVaults() {
@@ -134,6 +203,12 @@ function requiredEnv(name: string): string {
 
 function requiredAddress(name: string): Address {
   const value = requiredEnv(name);
+  if (!isAddress(value)) throw new Error(`${name} must be a valid address`);
+  return value;
+}
+
+function addressEnv(name: string, fallback: Address): Address {
+  const value = process.env[name] ?? fallback;
   if (!isAddress(value)) throw new Error(`${name} must be a valid address`);
   return value;
 }

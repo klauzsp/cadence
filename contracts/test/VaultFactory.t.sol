@@ -59,6 +59,7 @@ contract VaultFactoryTest is Test {
         assertEq(factory.vaultAt(0), address(vault));
         assertTrue(factory.isVault(address(vault)));
         assertEq(factory.vaultStrategy(address(vault)), dcaStrategyId);
+        assertEq(factory.vaultCreator(address(vault)), address(this));
         assertEq(factory.creatorVaultCount(address(this)), 1);
         assertEq(factory.creatorVaultAt(address(this), 0), address(vault));
     }
@@ -133,6 +134,9 @@ contract VaultFactoryTest is Test {
         assertEq(asset.balanceOf(address(vault)), DEPOSIT - TRANCHE);
         assertEq(target.balanceOf(address(vault)), TRANCHE);
         assertEq(vault.totalAssets(), DEPOSIT);
+        assertEq(vault.executionCount(), 1);
+        assertEq(vault.totalAssetsInvested(), TRANCHE);
+        assertEq(vault.totalTargetAcquired(), TRANCHE);
     }
 
     function testCannotExecuteTwiceInOneInterval() public {

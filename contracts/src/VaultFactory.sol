@@ -20,6 +20,7 @@ contract VaultFactory is Ownable, ReentrancyGuard {
     mapping(bytes32 strategyId => address strategyFactory) public strategyFactories;
     mapping(address vault => bool registered) public isVault;
     mapping(address vault => bytes32 strategyId) public vaultStrategy;
+    mapping(address vault => address creator) public vaultCreator;
 
     address[] private _vaults;
     mapping(address creator => address[] vaults) private _creatorVaults;
@@ -50,6 +51,7 @@ contract VaultFactory is Ownable, ReentrancyGuard {
 
         isVault[vault] = true;
         vaultStrategy[vault] = strategyId;
+        vaultCreator[vault] = msg.sender;
         _vaults.push(vault);
         _creatorVaults[msg.sender].push(vault);
 

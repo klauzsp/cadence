@@ -31,6 +31,9 @@ contract DcaVault is ERC4626, ReentrancyGuard {
     uint256 public immutable interval;
     uint16 public immutable maxSlippageBps;
     uint256 public nextExecution;
+    uint256 public executionCount;
+    uint256 public totalAssetsInvested;
+    uint256 public totalTargetAcquired;
 
     constructor(
         IERC20 asset_,
@@ -85,6 +88,10 @@ contract DcaVault is ERC4626, ReentrancyGuard {
         assetToken.forceApprove(address(swapAdapter), 0);
         targetTokensOut = targetToken.balanceOf(address(this)) - targetBalanceBefore;
         if (targetTokensOut < minTargetTokensOut) revert SlippageExceeded(minTargetTokensOut, targetTokensOut);
+
+        executionCount += 1;
+        totalAssetsInvested += assetsToInvest;
+        totalTargetAcquired += targetTokensOut;
 
         emit DcaExecuted(msg.sender, assetsToInvest, targetTokensOut, nextExecution);
     }
