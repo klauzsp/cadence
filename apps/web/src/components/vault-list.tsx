@@ -23,13 +23,6 @@ export function VaultList() {
     functionName: "vaultCount",
     query: { enabled: Boolean(vaultFactoryAddress) },
   });
-  const { data: owner } = useReadContract({
-    address: vaultFactoryAddress,
-    abi: vaultFactoryAbi,
-    functionName: "owner",
-    query: { enabled: Boolean(vaultFactoryAddress) },
-  });
-
   const vaultContracts = useMemo(
     () =>
       Array.from({ length: Number(count ?? 0n) }, (_, index) => ({
@@ -78,8 +71,6 @@ export function VaultList() {
     [rankingResults, vaults],
   );
 
-  const isAdmin = Boolean(account && owner && account.toLowerCase() === owner.toLowerCase());
-
   if (!vaultFactoryAddress) {
     return <p className="empty-state">The protocol has not been deployed yet.</p>;
   }
@@ -94,7 +85,6 @@ export function VaultList() {
             </button>
           ))}
         </div>
-        {isAdmin && <span className="role-badge admin">Protocol admin</span>}
       </div>
 
       {isLoading || isRanking ? (
@@ -187,10 +177,6 @@ function VaultCard({
       <div className="vault-overview">
         <div className="vault-card-topline">
           <span className="strategy-pill">{isRebalance ? "Rebalance" : "DCA"}</span>
-          <div className="role-badges">
-            {isCreator && <span className="role-badge">Creator</span>}
-            {isInvestor && <span className="role-badge investor">Investor</span>}
-          </div>
         </div>
         <h2>{name ?? "Loading strategy…"}</h2>
         <div className="vault-row-meta">

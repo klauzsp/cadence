@@ -22,7 +22,7 @@ import {
 const rpcUrl = requiredEnv("MONAD_RPC_URL");
 const privateKey = requiredEnv("KEEPER_PRIVATE_KEY") as Hex;
 const factoryAddress = requiredAddress("VAULT_FACTORY_ADDRESS");
-const pollIntervalMs = Number(process.env.POLL_INTERVAL_MS ?? "15000");
+const pollIntervalMs = Number(process.env.POLL_INTERVAL_MS ?? "5000");
 const dcaStrategyId = keccak256(toBytes("DCA_V1"));
 const rebalanceStrategyId = keccak256(toBytes("REBALANCE_V1"));
 const mainnetClient = createPublicClient({
@@ -70,6 +70,8 @@ process.on("SIGTERM", () => {
 console.log(`Keeper ${account.address} relaying Chainlink prices and watching factory ${factoryAddress}`);
 
 while (running) {
+  const cycleStartedAt = Date.now();
+
   try {
     await relayPrices();
   } catch (error) {
@@ -82,7 +84,10 @@ while (running) {
     console.error("Vault poll failed", error);
   }
 
-  if (running) await delay(pollIntervalMs);
+  if (running) {
+    const remainingDelay = Math.max(0, pollIntervalMs - (Date.now() - cycleStartedAt));
+    await delay(remainingDelay);
+  }
 }
 
 async function relayPrices() {

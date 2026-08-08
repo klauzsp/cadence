@@ -32,7 +32,8 @@ import {
 } from "@/lib/contracts";
 
 const frequencies = [
-  { label: "Every minute (demo)", seconds: 60 },
+  { label: "Every 5 seconds (demo)", seconds: 5 },
+  { label: "Every minute", seconds: 60 },
   { label: "Every hour", seconds: 3_600 },
   { label: "Every day", seconds: 86_400 },
   { label: "Every week", seconds: 604_800 },
