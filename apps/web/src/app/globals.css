@@ -1032,29 +1032,6 @@ select:focus {
   margin-bottom: 10px;
 }
 
-.live-indicator {
-  display: inline-flex;
-  padding: 8px 11px;
-  border: 1px solid rgba(24, 132, 80, 0.14);
-  border-radius: 999px;
-  align-items: center;
-  gap: 7px;
-  color: #147347;
-  background: #e9f8ef;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.live-indicator i {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #22a966;
-  box-shadow: 0 0 0 4px rgba(34, 169, 102, 0.12);
-}
-
 .activity-list {
   overflow: hidden;
   margin-top: 22px;

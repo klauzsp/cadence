@@ -822,16 +822,14 @@ export function VaultDashboard({ vault }: { vault: Address }) {
             <p className="eyebrow">Onchain activity</p>
             <h2>Recent {isRebalance ? "rebalances" : "executions"}</h2>
           </div>
-          <span className="live-indicator">
-            <i /> Live
-          </span>
         </div>
         {activityError && <p className="form-error">{activityError}</p>}
         {isActivityLoading ? (
           <p className="empty-state compact">Loading onchain activity…</p>
         ) : executions.length === 0 ? (
           <p className="empty-state compact">
-            No {isRebalance ? "rebalances" : "DCA swaps"} have executed yet.
+            No {isRebalance ? "rebalances" : "DCA swaps"} have executed yet. The
+            keeper backend may not currently be live.
           </p>
         ) : (
           <div className="activity-list">
