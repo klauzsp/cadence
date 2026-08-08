@@ -353,20 +353,7 @@ export function CreateStrategyForm() {
           <code>NEXT_PUBLIC_VAULT_FACTORY_ADDRESS</code>.
         </p>
       )}
-      <div className="form-context">
-        <p className="form-note">
-          {strategy === "dca"
-            ? "Fixed tranches execute on your selected schedule."
-            : "Trades execute only when allocation leaves the selected band."}
-        </p>
-        <p className="form-note">
-          Monad is the official testnet asset; USDC and WETH are Chainlink-priced test
-          assets.
-          {(tokenDetails(asset)?.acceptsNative ||
-            tokenDetails(target)?.acceptsNative) &&
-            " Keep Monad-involving vaults small."}
-        </p>
-      </div>
+
       {submitHint && <p className="form-note">{submitHint}</p>}
       {error && <p className="form-error">{error}</p>}
       {createdVault && (
