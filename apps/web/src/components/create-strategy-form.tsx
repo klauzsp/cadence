@@ -97,6 +97,12 @@ export function CreateStrategyForm() {
               ? "Enter a vault name and share symbol."
               : undefined;
 
+  function selectStrategy(nextStrategy: "dca" | "rebalance") {
+    setStrategy(nextStrategy);
+    setName(nextStrategy === "dca" ? "My DCA Strategy" : "My Balanced Strategy");
+    setSymbol(nextStrategy === "dca" ? "DCA" : "BAL");
+  }
+
   async function createStrategy(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSubmit || !vaultFactoryAddress || decimals === undefined || !account || !publicClient || !walletClient) return;
@@ -181,26 +187,34 @@ export function CreateStrategyForm() {
         <span className="strategy-pill">ERC-4626</span>
       </div>
 
-      <label>
-        Strategy type
-        <select
-          value={strategy}
-          onChange={(event) => {
-            const nextStrategy = event.target.value as "dca" | "rebalance";
-            setStrategy(nextStrategy);
-            setName(nextStrategy === "dca" ? "My DCA Strategy" : "My Balanced Strategy");
-            setSymbol(nextStrategy === "dca" ? "DCA" : "BAL");
-          }}
-        >
-          <option value="dca">Dollar-cost average</option>
-          <option value="rebalance">Threshold rebalance</option>
-        </select>
-      </label>
+      <fieldset className="strategy-choice">
+        <legend>Strategy type</legend>
+        <div className="strategy-toggle">
+          <button aria-pressed={strategy === "dca"} onClick={() => selectStrategy("dca")} type="button">
+            <span>DCA</span>
+            Fixed purchases
+          </button>
+          <button aria-pressed={strategy === "rebalance"} onClick={() => selectStrategy("rebalance")} type="button">
+            <span>Rebalance</span>
+            Allocation band
+          </button>
+        </div>
+      </fieldset>
 
-      <label>
-        Vault name
-        <input value={name} onChange={(event) => setName(event.target.value)} />
-      </label>
+      <div className="field-row metadata-row">
+        <label>
+          Vault name
+          <input value={name} onChange={(event) => setName(event.target.value)} />
+        </label>
+        <label>
+          Share symbol
+          <input
+            maxLength={10}
+            value={symbol}
+            onChange={(event) => setSymbol(event.target.value.toUpperCase())}
+          />
+        </label>
+      </div>
 
       <div className="field-row">
         <label>
@@ -235,7 +249,7 @@ export function CreateStrategyForm() {
         </label>
       </div>
 
-      <div className="field-row compact-row">
+      <div className={`field-row parameter-grid ${strategy}`}>
         {strategy === "dca" ? (
           <label>
             Amount per swap
@@ -280,14 +294,12 @@ export function CreateStrategyForm() {
             placeholder="1"
           />
         </label>
-        <label>
-          Share symbol
-          <input
-            maxLength={10}
-            value={symbol}
-            onChange={(event) => setSymbol(event.target.value.toUpperCase())}
-          />
-        </label>
+        {strategy === "dca" && (
+          <div className="parameter-info">
+            <span>Trigger</span>
+            <strong>Time based</strong>
+          </div>
+        )}
       </div>
 
       {!vaultFactoryAddress && (
@@ -295,13 +307,17 @@ export function CreateStrategyForm() {
           Deploy the protocol, then set <code>NEXT_PUBLIC_VAULT_FACTORY_ADDRESS</code>.
         </p>
       )}
-      <p className="form-note">MON is official testnet MON, wrapped automatically. tUSDC and tWETH are test assets with Chainlink pricing.</p>
-      {strategy === "rebalance" && (
-        <p className="form-note">The keeper trades only when the target-token allocation leaves the selected percentage band.</p>
-      )}
-      {(tokenDetails(asset)?.acceptsNative || tokenDetails(target)?.acceptsNative) && (
-        <p className="form-note">Trades that output MON share a deliberately small 0.1-WMON demo inventory, so keep MON-involving vaults small.</p>
-      )}
+      <div className="form-context">
+        <p className="form-note">
+          {strategy === "dca"
+            ? "Fixed tranches execute on your selected schedule."
+            : "Trades execute only when allocation leaves the selected band."}
+        </p>
+        <p className="form-note">
+          MON is official testnet MON; tUSDC and tWETH are Chainlink-priced test assets.
+          {(tokenDetails(asset)?.acceptsNative || tokenDetails(target)?.acceptsNative) && " Keep MON-involving vaults small."}
+        </p>
+      </div>
       {submitHint && <p className="form-note">{submitHint}</p>}
       {error && <p className="form-error">{error}</p>}
       {createdVault && (
