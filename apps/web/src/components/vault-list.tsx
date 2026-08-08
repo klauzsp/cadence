@@ -6,6 +6,7 @@ import { formatUnits, type Address } from "viem";
 import { useAccount, useReadContract, useReadContracts } from "wagmi";
 import {
   dcaVaultAbi,
+  rebalanceStrategyId,
   tokenDetails,
   vaultFactoryAbi,
   vaultFactoryAddress,
@@ -117,6 +118,12 @@ function VaultCard({
         functionName: "vaultCreator",
         args: [vault],
       },
+      {
+        address: vaultFactoryAddress as Address,
+        abi: vaultFactoryAbi,
+        functionName: "vaultStrategy",
+        args: [vault],
+      },
     ],
   });
 
@@ -129,6 +136,8 @@ function VaultCard({
   const executions = data?.[6].result as bigint | undefined;
   const userShares = data?.[7].result as bigint | undefined;
   const creator = data?.[8].result as Address | undefined;
+  const strategyId = data?.[9].result as `0x${string}` | undefined;
+  const isRebalance = strategyId === rebalanceStrategyId;
   const assetToken = tokenDetails(asset);
   const targetToken = tokenDetails(target);
   const isCreator = Boolean(
@@ -147,7 +156,7 @@ function VaultCard({
   return (
     <Link className="vault-card" href={`/vaults/${vault}`}>
       <div className="vault-card-topline">
-        <span className="strategy-pill">DCA</span>
+        <span className="strategy-pill">{isRebalance ? "Rebalance" : "DCA"}</span>
         <div className="role-badges">
           {isCreator && <span className="role-badge">Creator</span>}
           {isInvestor && <span className="role-badge investor">Investor</span>}

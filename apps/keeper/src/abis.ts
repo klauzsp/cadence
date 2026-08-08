@@ -46,6 +46,33 @@ export const dcaVaultAbi = [
   },
 ] as const;
 
+export const rebalanceVaultAbi = [
+  {
+    type: "function",
+    name: "nextExecution",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "needsRebalance",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [
+      { name: "needed", type: "bool" },
+      { name: "allocationBps", type: "uint256" },
+    ],
+  },
+  {
+    type: "function",
+    name: "rebalance",
+    stateMutability: "nonpayable",
+    inputs: [],
+    outputs: [{ name: "amountOut", type: "uint256" }],
+  },
+] as const;
+
 export const erc20Abi = [
   {
     type: "function",

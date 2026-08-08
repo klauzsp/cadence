@@ -1,18 +1,18 @@
 # Cadence
 
-Permissionless ERC-4626 investment strategies on Monad. The one-day hackathon MVP supports DCA vaults: anyone can create a vault with a deposit asset, target token, fixed tranche, and execution interval; anyone can execute a due tranche.
+Permissionless ERC-4626 investment strategies on Monad. The one-day hackathon MVP supports DCA and threshold-rebalance vaults. Anyone can create and invest in a vault, and anyone can execute an eligible strategy action.
 
 ## Structure
 
 ```text
 apps/web/   Next.js 16, TypeScript, wagmi, viem, RainbowKit
-apps/keeper/ TypeScript keeper that executes due DCA vaults
+apps/keeper/ TypeScript keeper that executes due strategy actions
 contracts/  Foundry, Solidity, OpenZeppelin ERC-4626
 ```
 
 `VaultFactory` is the protocol-level entry point. It maps stable strategy IDs to strategy-specific deployers, records every created vault, and keeps vault creation permissionless. The owner curates strategy types so arbitrary malicious implementations cannot present themselves as protocol strategies.
 
-`DCA_V1` is currently the only registered strategy. Its `DcaStrategyFactory` decodes DCA parameters and deploys `DcaVault` instances. The vault talks to `ISwapAdapter`, keeping DEX-specific routing outside both the vault and primary factory. Rebalance can later be added as another strategy factory without changing `VaultFactory`.
+`DCA_V1` invests a fixed tranche on a fixed schedule. `REBALANCE_V1` holds a configurable target-token allocation and trades back to its target only when the allocation leaves the configured drift band. Both are separate strategy factories behind the same primary `VaultFactory`. Vaults talk to `ISwapAdapter`, keeping DEX-specific routing outside both the vault and primary factory.
 
 `ChainlinkOracleRegistry` provides USD-denominated pricing, stale-round protection, and the token allowlist. The hybrid hackathon deployment uses official testnet WMON plus clearly labelled tUSDC and tWETH. A `NativeDepositRouter` wraps faucet MON 1:1 and deposits WMON in one transaction, because ERC-4626 assets must be ERC-20 tokens. Every vault calculates its own minimum swap output from Chainlink and its immutable `maxSlippageBps`; a keeper cannot weaken this protection.
 
@@ -78,6 +78,7 @@ pnpm contracts:test
 | --- | --- |
 | VaultFactory | `0x8947670a7C9147BA258234aE7FdEE6191e95fd1f` |
 | DcaStrategyFactory | `0xf96cb71BB6BC01312Afadab939aCCAd6531db9f6` |
+| RebalanceStrategyFactory | `0x2284f98F4e1685DFCE6B092bb29fcC28DF91a07d` |
 | ChainlinkOracleRegistry | `0x20EE4F01b31b4D2846Da3a436C3013785bDfC9Fd` |
 | InventorySwapAdapter | `0x4D7f5029f4154c7B998a69ea521C75E72d3e4C68` |
 | NativeDepositRouter | `0x00EA9027E3601608ab1B0A68b5753Fd2A4F2b82F` |
@@ -125,7 +126,7 @@ NEXT_PUBLIC_VAULT_FACTORY_ADDRESS=0x...
 
 ## Keeper
 
-The keeper is not trusted with slippage. It relays newer standard Chainlink mainnet rounds into the demo feeds, discovers due DCA vaults, and calls `executeDca()`; each vault reads the on-chain oracle and calculates its own minimum output.
+The keeper is not trusted with slippage. It relays newer standard Chainlink mainnet rounds into the demo feeds, calls `executeDca()` for due DCA vaults, and calls `rebalance()` only for due rebalance vaults outside their allocation band. Each vault reads the on-chain oracle and calculates its own minimum output.
 
 ```bash
 cp apps/keeper/.env.example apps/keeper/.env.local
@@ -153,10 +154,10 @@ The worker simulates every due execution, estimates its gas, applies a 10% buffe
 
 ## MVP boundaries
 
-- Execution is permissionless but not incentivized yet; a keeper or user must call `executeDca`.
+- Execution is permissionless but not incentivized yet; a keeper or user must call `executeDca` or `rebalance`.
 - tUSDC, tWETH, relayed feeds, and `InventorySwapAdapter` are testnet-only and centrally administered. MON/WMON is the official testnet asset. The adapter mimics finite DEX liquidity and must never be used with real value.
 - Chainlink pricing and stale-round validation protect valuation and swap slippage, but deployment feed addresses and staleness thresholds must be reviewed carefully.
 - A withdrawal may unwind the entire target position to satisfy ERC-4626 liquidity. Oracle slippage protection is enforced, but a production version should add exact-output routing to avoid unnecessary position sales.
 - The contracts have unit tests, but they are unaudited and should only be used on testnet.
 
-Natural next strategies are Rebalance and scheduled ERC-4626-to-ERC-4626 allocation, both behind separate vault implementations while reusing the factory/UI patterns.
+A natural next strategy is scheduled ERC-4626-to-ERC-4626 allocation behind another vault implementation while reusing the factory/UI patterns.

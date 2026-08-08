@@ -9,6 +9,8 @@ import { monadTestnet } from "wagmi/chains";
 import {
   dcaConfigParameters,
   dcaStrategyId,
+  rebalanceConfigParameters,
+  rebalanceStrategyId,
   transactionExplorerUrl,
   isDemoMode,
   supportedTokens,
@@ -30,11 +32,14 @@ export function CreateStrategyForm() {
   const { isPending: isSwitchingChain, switchChain } = useSwitchChain();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
+  const [strategy, setStrategy] = useState<"dca" | "rebalance">("dca");
   const [asset, setAsset] = useState<Address>(supportedTokens[0].address);
   const [target, setTarget] = useState<Address>(supportedTokens[2].address);
   const [amount, setAmount] = useState(isDemoMode ? "100" : "");
   const [frequency, setFrequency] = useState(frequencies[isDemoMode ? 0 : 2].seconds);
   const [maxSlippage, setMaxSlippage] = useState("1");
+  const [targetAllocation, setTargetAllocation] = useState("50");
+  const [threshold, setThreshold] = useState("5");
   const [name, setName] = useState("My DCA Strategy");
   const [symbol, setSymbol] = useState("DCA");
   const [isPending, setIsPending] = useState(false);
@@ -52,13 +57,20 @@ export function CreateStrategyForm() {
       isAddress(asset) &&
       isAddress(target) &&
       asset.toLowerCase() !== target.toLowerCase() &&
-      Number(amount) > 0 &&
+      (strategy === "rebalance" || Number(amount) > 0) &&
+      (strategy === "dca" || (
+        Number(targetAllocation) > 0 &&
+        Number(targetAllocation) < 100 &&
+        Number(threshold) > 0 &&
+        Number(threshold) < Number(targetAllocation) &&
+        Number(targetAllocation) + Number(threshold) < 100
+      )) &&
       Number(maxSlippage) >= 0 &&
       Number(maxSlippage) <= 10 &&
       decimals !== undefined &&
       name.length > 0 &&
       symbol.length > 0,
-    [amount, asset, chainId, decimals, isConnected, maxSlippage, name, symbol, target],
+    [amount, asset, chainId, decimals, isConnected, maxSlippage, name, strategy, symbol, target, targetAllocation, threshold],
   );
 
   const submitHint = !isConnected
@@ -67,8 +79,18 @@ export function CreateStrategyForm() {
       ? "Switch your wallet to Monad testnet."
       : asset.toLowerCase() === target.toLowerCase()
         ? "Deposit and target tokens must be different."
-        : !Number.isFinite(Number(amount)) || Number(amount) <= 0
+        : strategy === "dca" && (!Number.isFinite(Number(amount)) || Number(amount) <= 0)
           ? "Enter an amount greater than zero."
+          : strategy === "rebalance" && (
+              !Number.isFinite(Number(targetAllocation)) ||
+              !Number.isFinite(Number(threshold)) ||
+              Number(targetAllocation) <= 0 ||
+              Number(targetAllocation) >= 100 ||
+              Number(threshold) <= 0 ||
+              Number(threshold) >= Number(targetAllocation) ||
+              Number(targetAllocation) + Number(threshold) >= 100
+            )
+            ? "Choose a valid target and drift band that stay between 0% and 100%."
           : !Number.isFinite(Number(maxSlippage)) || Number(maxSlippage) < 0 || Number(maxSlippage) > 10
             ? "Max slippage must be between 0% and 10%."
             : !name.trim() || !symbol.trim()
@@ -84,15 +106,26 @@ export function CreateStrategyForm() {
     setCreatedVault(undefined);
     setCreatedTransaction(undefined);
 
-    const initData = encodeAbiParameters(dcaConfigParameters, [
-      asset as Address,
-      target as Address,
-      parseUnits(amount, decimals),
-      BigInt(frequency),
-      Math.round(Number(maxSlippage) * 100),
-      name,
-      symbol,
-    ]);
+    const initData = strategy === "dca"
+      ? encodeAbiParameters(dcaConfigParameters, [
+          asset as Address,
+          target as Address,
+          parseUnits(amount, decimals),
+          BigInt(frequency),
+          Math.round(Number(maxSlippage) * 100),
+          name,
+          symbol,
+        ])
+      : encodeAbiParameters(rebalanceConfigParameters, [
+          asset as Address,
+          target as Address,
+          Math.round(Number(targetAllocation) * 100),
+          Math.round(Number(threshold) * 100),
+          BigInt(frequency),
+          Math.round(Number(maxSlippage) * 100),
+          name,
+          symbol,
+        ]);
 
     try {
       const { request } = await publicClient.simulateContract({
@@ -100,7 +133,7 @@ export function CreateStrategyForm() {
         address: vaultFactoryAddress,
         abi: vaultFactoryAbi,
         functionName: "createVault",
-        args: [dcaStrategyId, initData],
+        args: [strategy === "dca" ? dcaStrategyId : rebalanceStrategyId, initData],
       });
       const estimate = await publicClient.estimateContractGas(request);
       const hash = await walletClient.writeContract({
@@ -143,10 +176,26 @@ export function CreateStrategyForm() {
       <div className="form-heading">
         <div>
           <p className="eyebrow">New vault</p>
-          <h2>Build your DCA</h2>
+          <h2>Build your strategy</h2>
         </div>
         <span className="strategy-pill">ERC-4626</span>
       </div>
+
+      <label>
+        Strategy type
+        <select
+          value={strategy}
+          onChange={(event) => {
+            const nextStrategy = event.target.value as "dca" | "rebalance";
+            setStrategy(nextStrategy);
+            setName(nextStrategy === "dca" ? "My DCA Strategy" : "My Balanced Strategy");
+            setSymbol(nextStrategy === "dca" ? "DCA" : "BAL");
+          }}
+        >
+          <option value="dca">Dollar-cost average</option>
+          <option value="rebalance">Threshold rebalance</option>
+        </select>
+      </label>
 
       <label>
         Vault name
@@ -187,17 +236,30 @@ export function CreateStrategyForm() {
       </div>
 
       <div className="field-row compact-row">
+        {strategy === "dca" ? (
+          <label>
+            Amount per swap
+            <input
+              inputMode="decimal"
+              value={amount}
+              onChange={(event) => setAmount(event.target.value)}
+              placeholder="100"
+            />
+          </label>
+        ) : (
+          <>
+            <label>
+              Target allocation ({tokenDetails(target)?.symbol}, %)
+              <input inputMode="decimal" value={targetAllocation} onChange={(event) => setTargetAllocation(event.target.value)} />
+            </label>
+            <label>
+              Drift threshold (%)
+              <input inputMode="decimal" value={threshold} onChange={(event) => setThreshold(event.target.value)} />
+            </label>
+          </>
+        )}
         <label>
-          Amount per swap
-          <input
-            inputMode="decimal"
-            value={amount}
-            onChange={(event) => setAmount(event.target.value)}
-            placeholder="100"
-          />
-        </label>
-        <label>
-          Frequency
+          {strategy === "dca" ? "Frequency" : "Minimum interval"}
           <select
             value={frequency}
             onChange={(event) => setFrequency(Number(event.target.value))}
@@ -234,8 +296,11 @@ export function CreateStrategyForm() {
         </p>
       )}
       <p className="form-note">MON is official testnet MON, wrapped automatically. tUSDC and tWETH are test assets with Chainlink pricing.</p>
-      {tokenDetails(target)?.acceptsNative && (
-        <p className="form-note">MON-target strategies share a deliberately small 0.1-WMON demo inventory, so use small tranches.</p>
+      {strategy === "rebalance" && (
+        <p className="form-note">The keeper trades only when the target-token allocation leaves the selected percentage band.</p>
+      )}
+      {(tokenDetails(asset)?.acceptsNative || tokenDetails(target)?.acceptsNative) && (
+        <p className="form-note">Trades that output MON share a deliberately small 0.1-WMON demo inventory, so keep MON-involving vaults small.</p>
       )}
       {submitHint && <p className="form-note">{submitHint}</p>}
       {error && <p className="form-error">{error}</p>}
@@ -268,7 +333,7 @@ export function CreateStrategyForm() {
               : "Switch to Monad testnet"
           : isPending
             ? "Confirm in wallet…"
-            : "Create DCA strategy"}
+            : strategy === "dca" ? "Create DCA strategy" : "Create rebalance strategy"}
       </button>
     </form>
   );

@@ -28,11 +28,23 @@ export function addressExplorerUrl(address: string) {
 }
 
 export const dcaStrategyId = keccak256(toBytes("DCA_V1"));
+export const rebalanceStrategyId = keccak256(toBytes("REBALANCE_V1"));
 
 export const dcaConfigParameters = [
   { name: "asset", type: "address" },
   { name: "targetToken", type: "address" },
   { name: "amountPerSwap", type: "uint256" },
+  { name: "interval", type: "uint256" },
+  { name: "maxSlippageBps", type: "uint16" },
+  { name: "name", type: "string" },
+  { name: "symbol", type: "string" },
+] as const;
+
+export const rebalanceConfigParameters = [
+  { name: "asset", type: "address" },
+  { name: "targetToken", type: "address" },
+  { name: "targetAllocationBps", type: "uint16" },
+  { name: "thresholdBps", type: "uint16" },
   { name: "interval", type: "uint256" },
   { name: "maxSlippageBps", type: "uint16" },
   { name: "name", type: "string" },
@@ -124,6 +136,13 @@ export const vaultFactoryAbi = [
     outputs: [{ type: "address" }],
   },
   {
+    type: "function",
+    name: "vaultStrategy",
+    stateMutability: "view",
+    inputs: [{ name: "vault", type: "address" }],
+    outputs: [{ type: "bytes32" }],
+  },
+  {
     type: "event",
     name: "VaultCreated",
     inputs: [
@@ -156,6 +175,33 @@ export const dcaVaultAbi = parseAbi([
   "function withdraw(uint256 assets, address receiver, address owner) returns (uint256 shares)",
   "function executeDca() returns (uint256 targetTokensOut)",
   "event DcaExecuted(address indexed executor, uint256 assetsIn, uint256 targetTokensOut, uint256 nextExecution)",
+]);
+
+export const rebalanceVaultAbi = parseAbi([
+  "error ERC20InsufficientBalance(address sender, uint256 balance, uint256 needed)",
+  "error ERC20InsufficientAllowance(address spender, uint256 allowance, uint256 needed)",
+  "error AllocationWithinThreshold(uint256 currentAllocationBps)",
+  "function asset() view returns (address)",
+  "function targetToken() view returns (address)",
+  "function targetAllocationBps() view returns (uint16)",
+  "function thresholdBps() view returns (uint16)",
+  "function interval() view returns (uint256)",
+  "function maxSlippageBps() view returns (uint16)",
+  "function nextExecution() view returns (uint256)",
+  "function executionCount() view returns (uint256)",
+  "function totalRebalanced() view returns (uint256)",
+  "function currentAllocationBps() view returns (uint256)",
+  "function needsRebalance() view returns (bool needed, uint256 allocationBps)",
+  "function totalAssets() view returns (uint256)",
+  "function totalSupply() view returns (uint256)",
+  "function decimals() view returns (uint8)",
+  "function name() view returns (string)",
+  "function symbol() view returns (string)",
+  "function balanceOf(address account) view returns (uint256)",
+  "function deposit(uint256 assets, address receiver) returns (uint256 shares)",
+  "function withdraw(uint256 assets, address receiver, address owner) returns (uint256 shares)",
+  "function rebalance() returns (uint256 amountOut)",
+  "event Rebalanced(address indexed executor, address indexed tokenIn, uint256 amountIn, address indexed tokenOut, uint256 amountOut, uint256 secondaryAllocationBps, uint256 nextExecution)",
 ]);
 
 export const erc20Abi = [

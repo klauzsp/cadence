@@ -15,6 +15,7 @@ import {
   dcaVaultAbi,
   demoFeedAbi,
   erc20Abi,
+  rebalanceVaultAbi,
   vaultFactoryAbi,
 } from "./abis.js";
 
@@ -23,6 +24,7 @@ const privateKey = requiredEnv("KEEPER_PRIVATE_KEY") as Hex;
 const factoryAddress = requiredAddress("VAULT_FACTORY_ADDRESS");
 const pollIntervalMs = Number(process.env.POLL_INTERVAL_MS ?? "15000");
 const dcaStrategyId = keccak256(toBytes("DCA_V1"));
+const rebalanceStrategyId = keccak256(toBytes("REBALANCE_V1"));
 const mainnetClient = createPublicClient({
   chain: monad,
   transport: http(process.env.MONAD_MAINNET_RPC_URL ?? "https://rpc.monad.xyz"),
@@ -142,13 +144,15 @@ async function processDueVaults() {
       functionName: "vaultStrategy",
       args: [vault],
     });
-    if (strategyId !== dcaStrategyId) continue;
-
-    await executeIfDue(vault, block.timestamp);
+    if (strategyId === dcaStrategyId) {
+      await executeDcaIfDue(vault, block.timestamp);
+    } else if (strategyId === rebalanceStrategyId) {
+      await executeRebalanceIfDue(vault, block.timestamp);
+    }
   }
 }
 
-async function executeIfDue(vault: Address, blockTimestamp: bigint) {
+async function executeDcaIfDue(vault: Address, blockTimestamp: bigint) {
   const [nextExecution, asset] = await Promise.all([
     publicClient.readContract({ address: vault, abi: dcaVaultAbi, functionName: "nextExecution" }),
     publicClient.readContract({ address: vault, abi: dcaVaultAbi, functionName: "asset" }),
@@ -192,6 +196,35 @@ async function executeIfDue(vault: Address, blockTimestamp: bigint) {
   } catch (error) {
     // Another keeper may have won the race, or the oracle/DEX may be temporarily unavailable.
     console.warn(`Skipped ${vault}`, error);
+  }
+}
+
+async function executeRebalanceIfDue(vault: Address, blockTimestamp: bigint) {
+  const [nextExecution, rebalanceStatus] = await Promise.all([
+    publicClient.readContract({ address: vault, abi: rebalanceVaultAbi, functionName: "nextExecution" }),
+    publicClient.readContract({ address: vault, abi: rebalanceVaultAbi, functionName: "needsRebalance" }),
+  ]);
+  if (blockTimestamp < nextExecution || !rebalanceStatus[0]) return;
+
+  try {
+    const { request } = await publicClient.simulateContract({
+      account,
+      address: vault,
+      abi: rebalanceVaultAbi,
+      functionName: "rebalance",
+    });
+    const estimatedGas = await publicClient.estimateContractGas(request);
+    const hash = await walletClient.writeContract({
+      ...request,
+      gas: estimatedGas + estimatedGas / 10n,
+    });
+    console.log(`Rebalancing ${vault}: ${hash}`);
+
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+    console.log(`Rebalanced ${vault} in block ${receipt.blockNumber}`);
+  } catch (error) {
+    // Another keeper may have won the race, or the oracle/DEX may be temporarily unavailable.
+    console.warn(`Skipped rebalance ${vault}`, error);
   }
 }
 
