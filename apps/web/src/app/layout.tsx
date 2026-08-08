@@ -3,7 +3,7 @@ import { Providers } from "./providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Cadence — Permissionless strategies on Monad",
+  title: "Cadence — Automated strategies on Monad",
   description: "Create transparent, automated ERC-4626 investment strategies.",
 };
 

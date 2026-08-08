@@ -1,14 +1,15 @@
 "use client";
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import Image from "next/image";
 import Link from "next/link";
 
 export function AppNav() {
   return (
     <nav>
       <Link className="wordmark" href="/" aria-label="Cadence home">
-        <span className="mark">C</span>
-        cadence
+        <Image className="company-logo" src="/logo.png" alt="" width={640} height={500} priority />
+        <span className="product-name">Cadence</span>
       </Link>
       <div className="nav-links">
         <Link href="/">Create</Link>

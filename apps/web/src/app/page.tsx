@@ -8,14 +8,15 @@ export default function Home() {
 
       <section className="hero" id="top">
         <div className="hero-copy">
-          <p className="eyebrow">Open strategy infrastructure</p>
+          <p className="eyebrow"><span aria-hidden="true">✦</span> Open strategy infrastructure</p>
           <h1>
-            Invest with a rhythm.
-            <span> Own the vault.</span>
+            Automated investing,
+            <span> open to everyone.</span>
           </h1>
           <p className="hero-text">
-            Create transparent ERC-4626 strategies that run on schedule. No
-            managers, no gatekeepers—just code and composable vault shares.
+            Create transparent ERC-4626 strategies on Monad. Choose DCA or
+            threshold rebalancing, invite deposits, and let permissionless
+            automation handle execution.
           </p>
           <div className="principles">
             <span>Permissionless creation</span>
@@ -27,7 +28,7 @@ export default function Home() {
       </section>
 
       <section className="how-it-works">
-        <p className="eyebrow">One strategy today. An open protocol tomorrow.</p>
+        <p className="eyebrow">Two strategies. One permissionless factory.</p>
         <div className="steps">
           <article>
             <span>01</span>
@@ -36,8 +37,8 @@ export default function Home() {
           </article>
           <article>
             <span>02</span>
-            <h3>Set the cadence</h3>
-            <p>Define a fixed tranche and interval. Anyone can trigger a due swap.</p>
+            <h3>Set the logic</h3>
+            <p>Choose a DCA schedule or a target allocation with a drift threshold.</p>
           </article>
           <article>
             <span>03</span>
