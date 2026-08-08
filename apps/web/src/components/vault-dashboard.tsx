@@ -539,14 +539,6 @@ export function VaultDashboard({ vault }: { vault: Address }) {
         </div>
       </section>
 
-      {isDemoMode && (
-        <div className="demo-banner">
-          Hybrid demo: Monad uses the official wrapped Monad token. USDC, WETH,
-          and the finite-liquidity swap venue are test-only; prices come from
-          Chainlink.
-        </div>
-      )}
-
       <section className="metric-grid">
         <Metric
           label="TVL"
