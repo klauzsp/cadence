@@ -1,6 +1,7 @@
 import {
   createPublicClient,
   createWalletClient,
+  fallback,
   http,
   isAddress,
   keccak256,
@@ -20,6 +21,8 @@ import {
 } from "./abis.js";
 
 const rpcUrl = requiredEnv("MONAD_RPC_URL");
+const fallbackRpcUrl =
+  process.env.MONAD_FALLBACK_RPC_URL ?? monadTestnet.rpcUrls.default.http[0];
 const privateKey = requiredEnv("KEEPER_PRIVATE_KEY") as Hex;
 const factoryAddress = requiredAddress("VAULT_FACTORY_ADDRESS");
 const pollIntervalMs = Number(process.env.POLL_INTERVAL_MS ?? "5000");
@@ -55,10 +58,54 @@ if (!Number.isFinite(pollIntervalMs) || pollIntervalMs < 1_000) {
 }
 
 const account = privateKeyToAccount(privateKey);
-const transport = http(rpcUrl);
+const transport = fallback(
+  [
+    http(rpcUrl, {
+      key: "monad-primary",
+      name: "Monad primary RPC",
+      timeout: 5_000,
+    }),
+    http(fallbackRpcUrl, {
+      key: "monad-fallback",
+      name: "Monad fallback RPC",
+      timeout: 8_000,
+    }),
+  ],
+  {
+    key: "monad-rpc-fallback",
+    name: "Monad RPC fallback",
+    rank: false,
+    retryCount: 2,
+    retryDelay: 500,
+  },
+);
 const publicClient = createPublicClient({ chain: monadTestnet, transport });
 const walletClient = createWalletClient({ account, chain: monadTestnet, transport });
 let running = true;
+
+type RpcResponse = Parameters<
+  Parameters<typeof publicClient.transport.onResponse>[0]
+>[0];
+
+function logRpcFailure({
+  error,
+  status,
+  transport: attemptedTransport,
+}: RpcResponse) {
+  if (status === "error") {
+    const message =
+      attemptedTransport.config.key === "monad-primary"
+        ? "Monad primary RPC failed; trying the fallback RPC"
+        : "Monad fallback RPC also failed; the keeper will retry";
+    console.warn(
+      message,
+      error.message,
+    );
+  }
+}
+
+publicClient.transport.onResponse(logRpcFailure);
+walletClient.transport.onResponse(logRpcFailure);
 
 process.on("SIGINT", () => {
   running = false;
@@ -68,6 +115,7 @@ process.on("SIGTERM", () => {
 });
 
 console.log(`Keeper ${account.address} relaying Chainlink prices and watching factory ${factoryAddress}`);
+console.log("RPC failover enabled: primary provider -> fallback provider");
 
 while (running) {
   const cycleStartedAt = Date.now();

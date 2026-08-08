@@ -44,6 +44,7 @@ All frontend variables are public by design. Never add `KEEPER_PRIVATE_KEY` to V
 
 ```text
 MONAD_RPC_URL
+MONAD_FALLBACK_RPC_URL
 MONAD_MAINNET_RPC_URL
 KEEPER_PRIVATE_KEY
 VAULT_FACTORY_ADDRESS
@@ -52,6 +53,8 @@ TESTNET_ETH_USD_FEED
 TESTNET_USDC_USD_FEED
 POLL_INTERVAL_MS=5000
 ```
+
+`MONAD_RPC_URL` is the primary provider. Set `MONAD_FALLBACK_RPC_URL` to an independent Monad testnet provider; if omitted, the keeper uses viem's configured Monad public testnet RPC. Transport failures and rate-limit responses automatically retry through the fallback. Do not use a second key from the same provider account if the goal is protection from an account-wide quota.
 
 5. Deploy and inspect the service logs. A healthy start includes a line beginning with `Keeper 0x... relaying Chainlink prices and watching factory 0x...`.
 

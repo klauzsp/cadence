@@ -199,7 +199,7 @@ cp apps/keeper/.env.example apps/keeper/.env.local
 pnpm keeper
 ```
 
-The keeper requires a dedicated testnet wallet funded with only enough MON for gas.
+The keeper requires a dedicated testnet wallet funded with only enough MON for gas. It automatically switches to an independent fallback RPC when the primary provider is unavailable or rate limited.
 
 ### Run checks
 
