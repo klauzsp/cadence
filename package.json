@@ -6,6 +6,8 @@
     "dev": "pnpm --filter web dev",
     "build": "pnpm --filter web build",
     "lint": "pnpm --filter web lint",
+    "keeper": "pnpm --filter keeper dev",
+    "keeper:check": "pnpm --filter keeper typecheck",
     "contracts:build": "forge build --root contracts",
     "contracts:test": "forge test --root contracts --offline"
   }

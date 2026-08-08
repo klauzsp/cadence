@@ -240,7 +240,7 @@ select:focus {
 }
 
 .compact-row {
-  grid-template-columns: 1fr 1fr 0.7fr;
+  grid-template-columns: 1fr 1fr 0.8fr 0.7fr;
 }
 
 .submit-button {

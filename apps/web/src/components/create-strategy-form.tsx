@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type FormEvent } from "react";
-import { isAddress, parseUnits, type Address } from "viem";
+import { encodeAbiParameters, isAddress, parseUnits, type Address } from "viem";
 import {
   useAccount,
   useReadContract,
@@ -9,9 +9,12 @@ import {
   useWriteContract,
 } from "wagmi";
 import {
-  dcaFactoryAbi,
-  dcaFactoryAddress,
+  dcaConfigParameters,
+  dcaStrategyId,
   erc20MetadataAbi,
+  supportedTokens,
+  vaultFactoryAbi,
+  vaultFactoryAddress,
 } from "@/lib/contracts";
 
 const frequencies = [
@@ -22,10 +25,11 @@ const frequencies = [
 
 export function CreateStrategyForm() {
   const { isConnected } = useAccount();
-  const [asset, setAsset] = useState("");
-  const [target, setTarget] = useState("");
+  const [asset, setAsset] = useState<Address>(supportedTokens[0].address);
+  const [target, setTarget] = useState<Address>(supportedTokens[2].address);
   const [amount, setAmount] = useState("");
   const [frequency, setFrequency] = useState(frequencies[1].seconds);
+  const [maxSlippage, setMaxSlippage] = useState("1");
   const [name, setName] = useState("My DCA Strategy");
   const [symbol, setSymbol] = useState("DCA");
 
@@ -45,33 +49,38 @@ export function CreateStrategyForm() {
   const canSubmit = useMemo(
     () =>
       isConnected &&
-      Boolean(dcaFactoryAddress) &&
+      Boolean(vaultFactoryAddress) &&
       isAddress(asset) &&
       isAddress(target) &&
       asset.toLowerCase() !== target.toLowerCase() &&
       Number(amount) > 0 &&
+      Number(maxSlippage) >= 0 &&
+      Number(maxSlippage) <= 10 &&
       decimals !== undefined &&
       name.length > 0 &&
       symbol.length > 0,
-    [amount, asset, decimals, isConnected, name, symbol, target],
+    [amount, asset, decimals, isConnected, maxSlippage, name, symbol, target],
   );
 
   function createStrategy(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canSubmit || !dcaFactoryAddress || decimals === undefined) return;
+    if (!canSubmit || !vaultFactoryAddress || decimals === undefined) return;
+
+    const initData = encodeAbiParameters(dcaConfigParameters, [
+      asset as Address,
+      target as Address,
+      parseUnits(amount, decimals),
+      BigInt(frequency),
+      Math.round(Number(maxSlippage) * 100),
+      name,
+      symbol,
+    ]);
 
     writeContract({
-      address: dcaFactoryAddress,
-      abi: dcaFactoryAbi,
+      address: vaultFactoryAddress,
+      abi: vaultFactoryAbi,
       functionName: "createVault",
-      args: [
-        asset as Address,
-        target as Address,
-        parseUnits(amount, decimals),
-        BigInt(frequency),
-        name,
-        symbol,
-      ],
+      args: [dcaStrategyId, initData],
     });
   }
 
@@ -93,19 +102,29 @@ export function CreateStrategyForm() {
       <div className="field-row">
         <label>
           Deposit token
-          <input
+          <select
             value={asset}
-            onChange={(event) => setAsset(event.target.value.trim())}
-            placeholder="0x…"
-          />
+            onChange={(event) => setAsset(event.target.value as Address)}
+          >
+            {supportedTokens.map((token) => (
+              <option key={token.address} value={token.address}>
+                {token.symbol} — {token.name}
+              </option>
+            ))}
+          </select>
         </label>
         <label>
           Target token
-          <input
+          <select
             value={target}
-            onChange={(event) => setTarget(event.target.value.trim())}
-            placeholder="0x…"
-          />
+            onChange={(event) => setTarget(event.target.value as Address)}
+          >
+            {supportedTokens.map((token) => (
+              <option key={token.address} value={token.address}>
+                {token.symbol} — {token.name}
+              </option>
+            ))}
+          </select>
         </label>
       </div>
 
@@ -133,6 +152,15 @@ export function CreateStrategyForm() {
           </select>
         </label>
         <label>
+          Max slippage
+          <input
+            inputMode="decimal"
+            value={maxSlippage}
+            onChange={(event) => setMaxSlippage(event.target.value)}
+            placeholder="1"
+          />
+        </label>
+        <label>
           Share symbol
           <input
             maxLength={10}
@@ -142,11 +170,12 @@ export function CreateStrategyForm() {
         </label>
       </div>
 
-      {!dcaFactoryAddress && (
+      {!vaultFactoryAddress && (
         <p className="form-note">
-          Deploy the factory, then set <code>NEXT_PUBLIC_DCA_FACTORY_ADDRESS</code>.
+          Deploy the protocol, then set <code>NEXT_PUBLIC_VAULT_FACTORY_ADDRESS</code>.
         </p>
       )}
+      <p className="form-note">Supported assets: USDC, wrapped MON, and wrapped ETH.</p>
       {error && <p className="form-error">{error.message}</p>}
       {isSuccess && <p className="form-success">Strategy created on Monad testnet.</p>}
 
