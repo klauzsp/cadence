@@ -1,54 +1,181 @@
-# Cadence
+<p align="center">
+  <img src="apps/web/public/logo.png" alt="Cadence" width="180" />
+</p>
 
-Permissionless ERC-4626 investment strategies on Monad. The one-day hackathon MVP supports DCA and threshold-rebalance vaults. Anyone can create and invest in a vault, and anyone can execute an eligible strategy action.
+<h1 align="center">Cadence</h1>
 
-## Structure
+<p align="center">
+  <strong>The open strategy layer for onchain investing.</strong>
+</p>
 
-```text
-apps/web/   Next.js 16, TypeScript, wagmi, viem, RainbowKit
-apps/keeper/ TypeScript keeper that executes due strategy actions
-contracts/  Foundry, Solidity, OpenZeppelin ERC-4626
+Investment strategies have traditionally been restrictive. Institutions decide which products get created, platforms decide which products get listed, and most investors can only choose from the finished menu.
+
+**Cadence opens up the strategy layer.** Any wallet can turn an investment idea into a public, investable vault on Monad. Other users can discover it, deposit capital and receive shares representing their ownership. Automation then runs the published rules transparently onchain.
+
+The hackathon version supports Dollar Cost Averaging and threshold rebalancing. A live keeper executes eligible strategies, Chainlink pricing protects trades, and a TVL leaderboard turns attracting capital into a competition.
+
+> Cadence is a testnet hackathon project. The contracts are unaudited and must not be used with real funds.
+
+## Why Cadence matters
+
+DeFi made assets open, but creating an investable strategy is still difficult. A creator normally needs to write and deploy contracts, build an interface, attract investors and operate automation. Cadence packages that entire workflow into one permissionless protocol:
+
+1. A strategist chooses the logic and deploys a vault from the frontend.
+2. Investors deposit into that vault and receive transferable vault shares.
+3. An independent keeper monitors the strategy and executes it when eligible.
+4. Every deposit, execution and withdrawal remains verifiable on Monad.
+
+There are no separate creator and investor account types. A wallet becomes a creator by deploying a vault and becomes an investor by owning its shares. The same wallet can be both.
+
+| Restrictive model                          | Cadence                                          |
+| ------------------------------------------ | ------------------------------------------------ |
+| Institutions create investment products    | Any wallet can launch a strategy                 |
+| Platforms control distribution             | Every vault is publicly discoverable             |
+| Strategy rules may be opaque or changeable | Rules are encoded in the deployed vault          |
+| Investors depend on a central operator     | Execution is automated and permissionless        |
+| Ownership lives in a platform account      | Ownership is represented by onchain vault shares |
+
+Cadence turns strategy creation into an open marketplace: creators compete to design useful strategies, while investors decide which strategies deserve capital.
+
+## Standout features
+
+### Permissionless strategy creation
+
+Any connected wallet can deploy a new vault through the primary `VaultFactory`. The protocol registers trusted strategy implementations, while vault creation itself stays open to everyone. Adding a future strategy does not require replacing the factory or redesigning the application.
+
+### Two automated strategies
+
+**Dollar Cost Average** invests a fixed amount of the deposit token into the target token on a chosen schedule. The five-second demo interval makes the automation visible during a short presentation.
+
+**Threshold Rebalance** maintains a selected target-token allocation. It only trades when the portfolio moves outside its allowed drift band, avoiding unnecessary executions while it remains on target.
+
+### Shared, investable vaults
+
+Each strategy is its own standards-based tokenized vault. Multiple investors can deposit into the same strategy, receive shares and withdraw their proportional position. The dashboard calculates both the connected wallet's position value and its percentage ownership of the vault.
+
+### TVL leaderboard
+
+The Vaults page ranks every strategy by live total value locked. The highest-TVL vault becomes the protocol champion, giving creators a visible incentive to build strategies that attract capital.
+
+### Automated keeper execution
+
+The TypeScript keeper runs independently from the frontend. Every five seconds it checks registered vaults and executes eligible DCA purchases or rebalances. Execution is still permissionless: if the keeper is unavailable, any user can trigger an eligible action from the dashboard.
+
+The keeper cannot choose a worse slippage limit. Each vault independently calculates its minimum acceptable output before allowing a swap.
+
+### Chainlink-powered pricing and protection
+
+Cadence uses Chainlink MON/USD, ETH/USD and USDC/USD prices to value each vault's mixed-token holdings, calculate rebalance allocations and set a protected minimum output for swaps. If a price is invalid or stale, execution stops safely.
+
+For the testnet demo, the keeper relays newer Chainlink rounds from Monad mainnet to dedicated testnet feeds. Chainlink does not hold funds or execute strategies: the keeper submits transactions, while each vault holds the assets and enforces the price protection onchain.
+
+### Native MON deposits
+
+Users can deposit faucet MON directly. A deposit router wraps it 1:1 into official testnet WMON and deposits it into the selected vault in a single transaction.
+
+### Transparent strategy dashboards
+
+Every vault has a live dashboard showing:
+
+- TVL, share price and return measured in the deposit asset
+- The connected investor's position and percentage ownership
+- Idle and invested balances
+- Execution count, schedule and next eligible execution
+- DCA tranche size or rebalance allocation status
+- Total assets invested and target tokens acquired
+- Recent onchain executions with Monad explorer links
+- Deposit, withdrawal and permissionless manual-execution controls
+
+Recent activity is read from contract events, so it is shared onchain data rather than browser-local history.
+
+## Three-minute demo walkthrough
+
+Before presenting, make sure the Railway keeper is running and its log begins with `Keeper 0x...`.
+
+1. **Create:** Connect a wallet, select DCA, choose Monad as the deposit token and WETH as the target, select the five-second frequency and deploy the vault.
+2. **Invest:** Open the new vault and deposit a very small amount of faucet MON. Cadence wraps and deposits it in one transaction.
+3. **Automate:** Wait for the keeper. The dashboard execution count and recent activity update after an eligible DCA purchase is confirmed.
+4. **Verify:** Open the execution link on Monad Explorer to show that the automation happened onchain.
+5. **Compete:** Open the Vaults page to show the strategy ranked against every other vault by TVL.
+6. **Expand:** Switch the creation form to Rebalance to demonstrate that the same protocol supports different strategy logic without changing the primary factory.
+
+Keep demo deposits small. The five-second setting controls eligibility; actual confirmation time also depends on block inclusion and RPC response time.
+
+## How the system fits together
+
+```mermaid
+flowchart LR
+    User[Creators and investors] --> Web[Next.js application]
+    Web --> Factory[VaultFactory]
+    Factory --> DCA[DCA strategy factory]
+    Factory --> Rebalance[Rebalance strategy factory]
+    DCA --> Vaults[Independent strategy vaults]
+    Rebalance --> Vaults
+    Keeper[Railway keeper] --> Vaults
+    Chainlink[Chainlink prices] --> Keeper
+    Keeper --> Relays[Testnet price relays]
+    Relays --> Oracle[Oracle registry]
+    Oracle --> Vaults
+    Vaults --> Explorer[Monad Explorer]
 ```
 
-`VaultFactory` is the protocol-level entry point. It maps stable strategy IDs to strategy-specific deployers, records every created vault, and keeps vault creation permissionless. The owner curates strategy types so arbitrary malicious implementations cannot present themselves as protocol strategies.
+The frontend never holds the keeper key. Vercel hosts the user interface, while Railway hosts the continuously running worker.
 
-`DCA_V1` invests a fixed tranche on a fixed schedule. `REBALANCE_V1` holds a configurable target-token allocation and trades back to its target only when the allocation leaves the configured drift band. Both are separate strategy factories behind the same primary `VaultFactory`. Vaults talk to `ISwapAdapter`, keeping DEX-specific routing outside both the vault and primary factory.
+## Demo assets
 
-`ChainlinkOracleRegistry` provides USD-denominated pricing, stale-round protection, and the token allowlist. The hybrid hackathon deployment uses official testnet WMON plus clearly labelled tUSDC and tWETH. A `NativeDepositRouter` wraps faucet MON 1:1 and deposits WMON in one transaction, because ERC-4626 assets must be ERC-20 tokens. Every vault calculates its own minimum swap output from Chainlink and its immutable `maxSlippageBps`; a keeper cannot weaken this protection.
+| User-facing asset | Demo implementation         | Notes                                               |
+| ----------------- | --------------------------- | --------------------------------------------------- |
+| Monad             | Official Monad testnet WMON | Native faucet MON is wrapped 1:1 when deposited     |
+| USDC              | Test USDC                   | Six decimals and Chainlink-based USD valuation      |
+| WETH              | Test WETH                   | Eighteen decimals and Chainlink-based ETH valuation |
 
-The deployed hackathon demo uses a finite-inventory test swap adapter rather than minting output on each trade. It starts with 0.1 official WMON, 1,000,000 tUSDC, and 500 tWETH, values trades at 99.5% of the Chainlink-derived quote, and fails when output inventory is insufficient. Its keeper reads the standard Chainlink MON/USD, ETH/USD, and USDC/USD feeds on Monad mainnet and relays only newer rounds to testnet. Relayed prices expire after two hours, so swaps stop if the relay stops.
+USDC and WETH are test representations used to demonstrate realistic vault accounting. They have no real-world value and can be requested from the in-app faucet. Monad/WMON is the official testnet asset.
 
-The upstream Chainlink proxy addresses used by the keeper are:
+## Deployed Monad testnet contracts
 
-| Feed | Monad mainnet Chainlink proxy |
-| --- | --- |
-| MON/USD | `0xBcD78f76005B7515837af6b50c7C52BCf73822fb` |
-| ETH/USD | `0x1B1414782B859871781bA3E4B0979b9ca57A0A04` |
-| USDC/USD | `0xf5F15f188AbCB0d165D1Edb7f37F7d6fA2fCebec` |
+| Contract                   | Address                                      |
+| -------------------------- | -------------------------------------------- |
+| VaultFactory               | `0x8947670a7C9147BA258234aE7FdEE6191e95fd1f` |
+| DCA strategy factory       | `0xf96cb71BB6BC01312Afadab939aCCAd6531db9f6` |
+| Rebalance strategy factory | `0x2284f98F4e1685DFCE6B092bb29fcC28DF91a07d` |
+| Chainlink oracle registry  | `0x20EE4F01b31b4D2846Da3a436C3013785bDfC9Fd` |
+| Inventory swap adapter     | `0x4D7f5029f4154c7B998a69ea521C75E72d3e4C68` |
+| Native MON deposit router  | `0x00EA9027E3601608ab1B0A68b5753Fd2A4F2b82F` |
+| Demo USDC                  | `0x37F8f050Bb677e588c60F4614D24CAe2d9a0B324` |
+| Official WMON              | `0xFb8bf4c1CC7a94c73D209a149eA2AbEa852BC541` |
+| Demo WETH                  | `0x9cF74BaFaabAeB901C7d88b195d72F6D497487e9` |
+| USDC/USD relay             | `0xFfFf324649aB0D50eBeD4bb83c90fc7C5Cc7dac2` |
+| MON/USD relay              | `0x910EB659119Eac93001e192f1B2Cc7c038A61CA5` |
+| ETH/USD relay              | `0x0b406fB7F796B4387cdBa4815bCf7B6Ca46C56d6` |
 
-The relay copies Chainlink's on-chain answer and original `updatedAt` timestamp rather than inventing a fresh timestamp. The oracle rejects non-positive, incomplete, future-dated, and stale rounds.
+## Technology
 
-## Monad testnet addresses
+| Layer             | Technology                                     |
+| ----------------- | ---------------------------------------------- |
+| Network           | Monad testnet                                  |
+| Contracts         | Solidity, Foundry, OpenZeppelin                |
+| Vault standard    | ERC-4626                                       |
+| Pricing           | Chainlink-compatible feeds and oracle registry |
+| Frontend          | Next.js 16, React, TypeScript                  |
+| Blockchain client | viem and wagmi                                 |
+| Wallet connection | RainbowKit and Reown                           |
+| Keeper            | TypeScript worker hosted on Railway            |
+| Frontend hosting  | Vercel                                         |
 
-The token contracts below come from the Monad Foundation testnet token list and returned the expected symbol and decimals on chain on 2026-08-08.
+## Repository structure
 
-| Asset | Contract | Decimals |
-| --- | --- | ---: |
-| USDC | `0x534b2f3A21130d7a60830c2Df862319e593943A3` | 6 |
-| WMON | `0xFb8bf4c1CC7a94c73D209a149eA2AbEa852BC541` | 18 |
-| WETH | `0x45477f4709771331db81944A5E20eF95Bc7BA2D7` | 18 |
+```text
+apps/web/       Next.js frontend and vault dashboards
+apps/keeper/    Automated strategy executor and price relay
+contracts/      Solidity contracts, tests and deployment scripts
+DEPLOYMENT.md   Vercel and Railway deployment guide
+```
 
-Chainlink's historical Monad testnet reference-data endpoint contains these proxy addresses, but neither currently has bytecode on Monad testnet. They are recorded for investigation only and must not be used for deployment.
-
-| Feed | Historical proxy | Current status |
-| --- | --- | --- |
-| ETH/USD | `0x0c76859E85727683Eeba0C70Bc2e0F5781337818` | No contract code |
-| USDC/USD | `0x70BB0758a38ae43418ffcEd9A25273dd4e804D15` | No contract code |
-| MON/USD | Not listed | Unavailable |
+`VaultFactory` is the primary protocol entry point. Each strategy has a dedicated factory and vault implementation behind it, while `ISwapAdapter` keeps exchange-specific routing separate from the strategy logic.
 
 ## Run locally
 
-Requirements: Node 22+, pnpm 10+, and Foundry.
+Requirements: Node.js 22+, pnpm 10+ and Foundry.
 
 ```bash
 pnpm install
@@ -57,11 +184,24 @@ forge install --root contracts --no-git OpenZeppelin/openzeppelin-contracts
 pnpm dev
 ```
 
-Open `/` to create a strategy, `/vaults` to browse strategies, and `/vaults/<address>` to deposit, withdraw, execute, and inspect metrics. MON deposits use native faucet MON and are wrapped into official WMON automatically. For tUSDC or tWETH deposits, use the in-app test-token faucet before approving. Wallet roles are derived on chain: the factory owner is the protocol admin, `vaultCreator` identifies the creator, and a nonzero share balance identifies an investor.
+Open:
 
-The supplied Alchemy testnet RPC and Reown project ID live in the gitignored `apps/web/.env.local`. Copy `apps/web/.env.example` when setting up another machine.
+- `/` to create a strategy
+- `/vaults` to browse the TVL leaderboard
+- `/vaults/<address>` to invest, withdraw and inspect a vault
 
-Run all checks:
+Local RPC, Reown and contract settings live in the gitignored `apps/web/.env.local`. Use `apps/web/.env.example` when configuring another machine.
+
+### Run the keeper locally
+
+```bash
+cp apps/keeper/.env.example apps/keeper/.env.local
+pnpm keeper
+```
+
+The keeper requires a dedicated testnet wallet funded with only enough MON for gas.
+
+### Run checks
 
 ```bash
 pnpm lint
@@ -70,96 +210,6 @@ pnpm keeper:check
 pnpm contracts:test
 ```
 
-## Deploy
+## What comes next
 
-For hosted deployment, follow [DEPLOYMENT.md](./DEPLOYMENT.md): Vercel hosts the Next.js frontend and Railway runs the five-second keeper as an always-on worker.
-
-### Current Monad testnet demo
-
-| Contract | Address |
-| --- | --- |
-| VaultFactory | `0x8947670a7C9147BA258234aE7FdEE6191e95fd1f` |
-| DcaStrategyFactory | `0xf96cb71BB6BC01312Afadab939aCCAd6531db9f6` |
-| RebalanceStrategyFactory | `0x2284f98F4e1685DFCE6B092bb29fcC28DF91a07d` |
-| ChainlinkOracleRegistry | `0x20EE4F01b31b4D2846Da3a436C3013785bDfC9Fd` |
-| InventorySwapAdapter | `0x4D7f5029f4154c7B998a69ea521C75E72d3e4C68` |
-| NativeDepositRouter | `0x00EA9027E3601608ab1B0A68b5753Fd2A4F2b82F` |
-| Test USDC | `0x37F8f050Bb677e588c60F4614D24CAe2d9a0B324` |
-| Official WMON | `0xFb8bf4c1CC7a94c73D209a149eA2AbEa852BC541` |
-| Test WETH | `0x9cF74BaFaabAeB901C7d88b195d72F6D497487e9` |
-| USDC/USD relay | `0xFfFf324649aB0D50eBeD4bb83c90fc7C5Cc7dac2` |
-| MON/USD relay | `0x910EB659119Eac93001e192f1B2Cc7c038A61CA5` |
-| ETH/USD relay | `0x0b406fB7F796B4387cdBa4815bCf7B6Ca46C56d6` |
-
-The replacement factory starts with no vaults so strategies created through the frontend belong to the connected creator. Local ignored env files already point the web app and keeper at this deployment.
-
-### Production-style deployment
-
-1. Implement and test an `ISwapAdapter` for the chosen Monad testnet DEX. Its `quote` must value `tokenIn` in `tokenOut`, and `swapExactInput` must pull `tokenIn` from the calling vault.
-2. Fund the deployer with testnet MON.
-3. Keep the private key out of the repository and run:
-
-```bash
-export MONAD_RPC_URL="https://monad-testnet.g.alchemy.com/v2/..."
-export PRIVATE_KEY="..."
-export SWAP_ADAPTER_ADDRESS="0x..."
-export USDC_ADDRESS="0x..."
-export WMON_ADDRESS="0x..."
-export WETH_ADDRESS="0x..."
-export USDC_USD_FEED="0x..."
-export MON_USD_FEED="0x..."
-export ETH_USD_FEED="0x..."
-export ORACLE_MAX_STALENESS="86400"
-forge script contracts/script/DeployProtocol.s.sol:DeployProtocol \
-  --root contracts \
-  --rpc-url "$MONAD_RPC_URL" \
-  --broadcast
-```
-
-Do not copy mainnet addresses into a testnet deployment. Chainlink announced Data Feeds on Monad testnet in May 2025, and its historical reference-data endpoint lists ETH/USD and USDC/USD proxies. Those historical proxies currently have no bytecode on chain, and the endpoint contains no MON/USD feed. The deployment therefore continues to require explicit feed addresses and must not be broadcast until all three addresses are independently verified as live after the latest testnet re-genesis.
-
-4. Set the deployed factory in `apps/web/.env.local`:
-
-```text
-NEXT_PUBLIC_VAULT_FACTORY_ADDRESS=0x...
-```
-
-5. Restart `pnpm dev`.
-
-## Keeper
-
-The keeper is not trusted with slippage. It relays newer standard Chainlink mainnet rounds into the demo feeds, calls `executeDca()` for due DCA vaults, and calls `rebalance()` only for due rebalance vaults outside their allocation band. Each vault reads the on-chain oracle and calculates its own minimum output.
-
-```bash
-cp apps/keeper/.env.example apps/keeper/.env.local
-```
-
-Set a funded testnet keeper key and the deployed primary factory:
-
-```text
-MONAD_RPC_URL=https://monad-testnet.g.alchemy.com/v2/...
-KEEPER_PRIVATE_KEY=0x...
-VAULT_FACTORY_ADDRESS=0x...
-TESTNET_MON_USD_FEED=0x...
-TESTNET_ETH_USD_FEED=0x...
-TESTNET_USDC_USD_FEED=0x...
-POLL_INTERVAL_MS=5000
-```
-
-Then run:
-
-```bash
-pnpm keeper
-```
-
-The worker simulates every due execution, estimates its gas, applies a 10% buffer, submits, and waits for the receipt. Keep the keeper key in `.env.local` and fund it only with the MON needed for gas.
-
-## MVP boundaries
-
-- Execution is permissionless but not incentivized yet; a keeper or user must call `executeDca` or `rebalance`.
-- tUSDC, tWETH, relayed feeds, and `InventorySwapAdapter` are testnet-only and centrally administered. MON/WMON is the official testnet asset. The adapter mimics finite DEX liquidity and must never be used with real value.
-- Chainlink pricing and stale-round validation protect valuation and swap slippage, but deployment feed addresses and staleness thresholds must be reviewed carefully.
-- A withdrawal may unwind the entire target position to satisfy ERC-4626 liquidity. Oracle slippage protection is enforced, but a production version should add exact-output routing to avoid unnecessary position sales.
-- The contracts have unit tests, but they are unaudited and should only be used on testnet.
-
-A natural next strategy is scheduled ERC-4626-to-ERC-4626 allocation behind another vault implementation while reusing the factory/UI patterns.
+Cadence is designed to grow by registering new strategy factories. Natural extensions include scheduled yield allocation, multi-vault portfolio strategies, automated fee sharing for creators, keeper incentives, account abstraction and AI-assisted strategy configuration.
