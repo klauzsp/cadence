@@ -72,6 +72,8 @@ pnpm contracts:test
 
 ## Deploy
 
+For hosted deployment, follow [DEPLOYMENT.md](./DEPLOYMENT.md): Vercel hosts the Next.js frontend and Railway runs the five-second keeper as an always-on worker.
+
 ### Current Monad testnet demo
 
 | Contract | Address |

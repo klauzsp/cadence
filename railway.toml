@@ -1,0 +1,8 @@
+[build]
+builder = "railpack"
+buildCommand = "pnpm --filter keeper build"
+
+[deploy]
+startCommand = "pnpm --filter keeper start"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
