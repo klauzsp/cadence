@@ -306,6 +306,21 @@ select:focus {
   color: #167537;
 }
 
+.form-success a,
+.explorer-link,
+.activity-list a {
+  color: inherit;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.explorer-link {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
 .dashboard-header {
   padding: 72px 0 42px;
 }
@@ -508,6 +523,12 @@ select:focus {
   gap: 1px;
 }
 
+.metric-explanation {
+  margin: -18px 0 34px;
+  color: rgba(23, 21, 15, 0.58);
+  font-size: 12px;
+}
+
 .metric-grid article {
   min-height: 118px;
   justify-content: space-between;
@@ -518,6 +539,10 @@ select:focus {
 .metric-grid article:nth-child(2),
 .metric-grid article:nth-child(5) {
   background: rgba(201, 255, 61, 0.92);
+}
+
+.metric-grid article:last-child:nth-child(3n + 1) {
+  grid-column: 1 / -1;
 }
 
 .metric-grid strong {
@@ -778,6 +803,10 @@ select:focus {
 
   .metric-grid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .metric-grid article:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
   }
 
   .card-metrics {

@@ -10,6 +10,7 @@ import {
 } from "viem";
 import {
   useAccount,
+  useBalance,
   useBlock,
   usePublicClient,
   useReadContracts,
@@ -17,15 +18,19 @@ import {
 } from "wagmi";
 import {
   dcaVaultAbi,
+  addressExplorerUrl,
   erc20Abi,
   isDemoMode,
+  nativeDepositRouterAbi,
+  nativeDepositRouterAddress,
   protocolDeploymentBlock,
   tokenDetails,
+  transactionExplorerUrl,
   vaultFactoryAbi,
   vaultFactoryAddress,
 } from "@/lib/contracts";
 
-type Action = "approve" | "deposit" | "withdraw" | "execute" | "faucet";
+type Action = "approve" | "deposit" | "nativeDeposit" | "withdraw" | "execute" | "faucet";
 type Execution = {
   transactionHash: Hex;
   blockNumber: bigint;
@@ -39,6 +44,10 @@ export function VaultDashboard({ vault }: { vault: Address }) {
   const { address: account, isConnected } = useAccount();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
+  const { data: nativeBalance, refetch: refetchNativeBalance } = useBalance({
+    address: account,
+    query: { enabled: Boolean(account) },
+  });
   const { data: latestBlock } = useBlock({ watch: true });
   const [depositAmount, setDepositAmount] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
@@ -140,6 +149,9 @@ export function VaultDashboard({ vault }: { vault: Address }) {
   const targetBalance = positionData?.[4].result as bigint | undefined;
   const depositUnits = parseAmount(depositAmount, assetDecimals);
   const withdrawUnits = parseAmount(withdrawAmount, assetDecimals);
+  const acceptsNative = Boolean(assetToken?.acceptsNative);
+  const depositSourceBalance = acceptsNative ? nativeBalance?.value : userAssetBalance;
+  const hasDepositBalance = depositUnits <= (depositSourceBalance ?? 0n);
 
   const numericAssets = Number(formatUnits(totalAssets ?? 0n, assetDecimals));
   const numericSupply = Number(formatUnits(totalSupply ?? 0n, assetDecimals));
@@ -147,6 +159,9 @@ export function VaultDashboard({ vault }: { vault: Address }) {
   const strategyReturn = (sharePrice - 1) * 100;
   const userShareAmount = Number(formatUnits(userShares ?? 0n, assetDecimals));
   const userPositionValue = userShareAmount * sharePrice;
+  const ownershipPercent = totalSupply && totalSupply > 0n
+    ? Number(((userShares ?? 0n) * 1_000_000n) / totalSupply) / 10_000
+    : 0;
   const investedValue = (totalAssets ?? 0n) > (idleAssets ?? 0n)
     ? (totalAssets ?? 0n) - (idleAssets ?? 0n)
     : 0n;
@@ -219,6 +234,18 @@ export function VaultDashboard({ vault }: { vault: Address }) {
         });
         const estimate = await publicClient.estimateContractGas(request);
         hash = await walletClient.writeContract({ ...request, gas: addGasBuffer(estimate) });
+      } else if (action === "nativeDeposit") {
+        if (!nativeDepositRouterAddress) throw new Error("Native MON deposits are not configured");
+        const { request } = await publicClient.simulateContract({
+          account,
+          address: nativeDepositRouterAddress,
+          abi: nativeDepositRouterAbi,
+          functionName: "deposit",
+          args: [vault, account],
+          value: depositUnits,
+        });
+        const estimate = await publicClient.estimateContractGas(request);
+        hash = await walletClient.writeContract({ ...request, gas: addGasBuffer(estimate) });
       } else if (action === "withdraw") {
         const { request } = await publicClient.simulateContract({
           account,
@@ -251,8 +278,8 @@ export function VaultDashboard({ vault }: { vault: Address }) {
 
       setTransactionHash(hash);
       await publicClient.waitForTransactionReceipt({ hash });
-      await Promise.all([refetchCore(), refetchPosition()]);
-      if (action === "deposit") setDepositAmount("");
+      await Promise.all([refetchCore(), refetchPosition(), refetchNativeBalance()]);
+      if (action === "deposit" || action === "nativeDeposit") setDepositAmount("");
       if (action === "withdraw") setWithdrawAmount("");
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Transaction failed");
@@ -267,6 +294,9 @@ export function VaultDashboard({ vault }: { vault: Address }) {
         <div>
           <p className="eyebrow">DCA strategy · {symbol ?? "—"}</p>
           <h1>{name ?? "Loading vault…"}</h1>
+          <a className="explorer-link" href={addressExplorerUrl(vault)} rel="noreferrer" target="_blank">
+            View vault contract ↗
+          </a>
           <div className="pair-line large">
             <strong>{assetToken?.symbol ?? "Asset"}</strong>
             <span>→</span>
@@ -282,7 +312,7 @@ export function VaultDashboard({ vault }: { vault: Address }) {
 
       {isDemoMode && (
         <div className="demo-banner">
-          Demo mode: prices are relayed from Chainlink on Monad mainnet. Tokens and swaps are test-only.
+          Hybrid demo: MON uses official WMON. tUSDC, tWETH, and the finite-liquidity swap venue are test-only; prices come from Chainlink.
         </div>
       )}
 
@@ -291,18 +321,22 @@ export function VaultDashboard({ vault }: { vault: Address }) {
         <Metric label="Share price" value={`${sharePrice.toFixed(4)} ${assetToken?.symbol ?? ""}`} />
         <Metric label="Strategy return" value={`${strategyReturn >= 0 ? "+" : ""}${strategyReturn.toFixed(2)}%`} />
         <Metric label="Your position" value={`${userPositionValue.toFixed(4)} ${assetToken?.symbol ?? ""}`} />
+        <Metric label="Your vault ownership" value={isConnected ? `${ownershipPercent.toFixed(2)}%` : "Connect wallet"} />
         <Metric label="Invested allocation" value={`${investedPercent.toFixed(1)}%`} />
         <Metric label="Executions" value={executionCount?.toString() ?? "0"} />
       </section>
+      <p className="metric-explanation">
+        Return is measured in {assetToken?.symbol ?? "the deposit asset"} and includes execution spread plus price movement of the accumulated {targetToken?.symbol ?? "target token"}.
+      </p>
 
       <section className="vault-layout">
         <div className="panel">
           <p className="eyebrow">Investor actions</p>
           <h2>Fund your position</h2>
           <p className="balance-line">
-            Wallet balance: {formatAmount(userAssetBalance, assetDecimals)} {assetToken?.symbol}
+            Wallet balance: {formatAmount(depositSourceBalance, assetDecimals)} {assetToken?.symbol}
           </p>
-          {isDemoMode && (
+          {isDemoMode && assetToken?.isTestToken && (
             <button className="secondary-button" disabled={!isConnected || Boolean(pendingAction)} onClick={() => runAction("faucet")}>
               {pendingAction === "faucet" ? "Requesting…" : `Get demo ${assetToken?.symbol ?? "tokens"}`}
             </button>
@@ -311,14 +345,26 @@ export function VaultDashboard({ vault }: { vault: Address }) {
             Deposit amount
             <input inputMode="decimal" value={depositAmount} onChange={(event) => setDepositAmount(event.target.value)} placeholder="100" />
           </label>
-          <div className="action-row">
-            <button className="secondary-button" disabled={!isConnected || depositUnits === 0n || Boolean(pendingAction)} onClick={() => runAction("approve")}>
-              {pendingAction === "approve" ? "Approving…" : "1. Approve"}
+          {depositUnits > 0n && !hasDepositBalance && (
+            <p className="form-error">
+              Insufficient {assetToken?.symbol ?? "token"} balance.
+              {isDemoMode && assetToken?.isTestToken && ` Use “Get demo ${assetToken?.symbol ?? "tokens"}” first.`}
+            </p>
+          )}
+          {acceptsNative ? (
+            <button className="primary-button full" disabled={!isConnected || depositUnits === 0n || !hasDepositBalance || Boolean(pendingAction)} onClick={() => runAction("nativeDeposit")}>
+              {pendingAction === "nativeDeposit" ? "Wrapping and depositing…" : "Deposit MON"}
             </button>
-            <button className="primary-button" disabled={!isConnected || depositUnits === 0n || (allowance ?? 0n) < depositUnits || Boolean(pendingAction)} onClick={() => runAction("deposit")}>
-              {pendingAction === "deposit" ? "Depositing…" : "2. Deposit"}
-            </button>
-          </div>
+          ) : (
+            <div className="action-row">
+              <button className="secondary-button" disabled={!isConnected || depositUnits === 0n || Boolean(pendingAction)} onClick={() => runAction("approve")}>
+                {pendingAction === "approve" ? "Approving…" : "1. Approve"}
+              </button>
+              <button className="primary-button" disabled={!isConnected || depositUnits === 0n || !hasDepositBalance || (allowance ?? 0n) < depositUnits || Boolean(pendingAction)} onClick={() => runAction("deposit")}>
+                {pendingAction === "deposit" ? "Depositing…" : "2. Deposit"}
+              </button>
+            </div>
+          )}
 
           <div className="panel-divider" />
           <label>
@@ -328,8 +374,13 @@ export function VaultDashboard({ vault }: { vault: Address }) {
           <button className="secondary-button full" disabled={!isInvestor || withdrawUnits === 0n || Boolean(pendingAction)} onClick={() => runAction("withdraw")}>
             {pendingAction === "withdraw" ? "Withdrawing…" : "Withdraw"}
           </button>
+          {acceptsNative && <p className="form-note">Withdrawals return official WMON, which can be unwrapped 1:1 to MON.</p>}
           {actionError && <p className="form-error">{actionError}</p>}
-          {transactionHash && <p className="form-success">Transaction confirmed: {shortAddress(transactionHash)}</p>}
+          {transactionHash && (
+            <p className="form-success">
+              Transaction confirmed: <a href={transactionExplorerUrl(transactionHash)} rel="noreferrer" target="_blank">{shortAddress(transactionHash)} ↗</a>
+            </p>
+          )}
         </div>
 
         <div className="panel">
@@ -367,7 +418,10 @@ export function VaultDashboard({ vault }: { vault: Address }) {
                 </div>
                 <div>
                   <strong>{formatAmount(execution.targetTokensOut, targetDecimals)} {targetToken?.symbol} acquired</strong>
-                  <span>block {execution.blockNumber.toString()}</span>
+                  <span>
+                    block {execution.blockNumber.toString()} ·{" "}
+                    <a href={transactionExplorerUrl(execution.transactionHash)} rel="noreferrer" target="_blank">view transaction ↗</a>
+                  </span>
                 </div>
               </article>
             ))}

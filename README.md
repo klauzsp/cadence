@@ -14,9 +14,9 @@ contracts/  Foundry, Solidity, OpenZeppelin ERC-4626
 
 `DCA_V1` is currently the only registered strategy. Its `DcaStrategyFactory` decodes DCA parameters and deploys `DcaVault` instances. The vault talks to `ISwapAdapter`, keeping DEX-specific routing outside both the vault and primary factory. Rebalance can later be added as another strategy factory without changing `VaultFactory`.
 
-`ChainlinkOracleRegistry` provides USD-denominated pricing, stale-round protection, and the token allowlist. The UI offers the deployment-configured USDC, WMON, and WETH contracts as fixed dropdown choices. WMON is used instead of native MON because ERC-4626 assets are ERC-20 tokens. Every vault calculates its own minimum swap output from Chainlink and its immutable `maxSlippageBps`; a keeper cannot weaken this protection.
+`ChainlinkOracleRegistry` provides USD-denominated pricing, stale-round protection, and the token allowlist. The hybrid hackathon deployment uses official testnet WMON plus clearly labelled tUSDC and tWETH. A `NativeDepositRouter` wraps faucet MON 1:1 and deposits WMON in one transaction, because ERC-4626 assets must be ERC-20 tokens. Every vault calculates its own minimum swap output from Chainlink and its immutable `maxSlippageBps`; a keeper cannot weaken this protection.
 
-The deployed hackathon demo uses faucet versions of USDC, WMON, and WETH plus a deterministic test swap adapter. Its keeper reads the standard Chainlink MON/USD, ETH/USD, and USDC/USD feeds on Monad mainnet and relays only newer rounds to testnet. Relayed prices expire after two hours, so swaps stop if the relay stops. This preserves realistic pricing and failure behavior while remaining clearly separate from production infrastructure.
+The deployed hackathon demo uses a finite-inventory test swap adapter rather than minting output on each trade. It starts with 0.1 official WMON, 1,000,000 tUSDC, and 500 tWETH, values trades at 99.5% of the Chainlink-derived quote, and fails when output inventory is insufficient. Its keeper reads the standard Chainlink MON/USD, ETH/USD, and USDC/USD feeds on Monad mainnet and relays only newer rounds to testnet. Relayed prices expire after two hours, so swaps stop if the relay stops.
 
 The upstream Chainlink proxy addresses used by the keeper are:
 
@@ -57,7 +57,7 @@ forge install --root contracts --no-git OpenZeppelin/openzeppelin-contracts
 pnpm dev
 ```
 
-Open `/` to create a strategy, `/vaults` to browse strategies, and `/vaults/<address>` to deposit, withdraw, execute, and inspect metrics. In demo mode, use the token faucet button before approving a deposit. Wallet roles are derived on chain: the factory owner is the protocol admin, `vaultCreator` identifies the creator, and a nonzero share balance identifies an investor.
+Open `/` to create a strategy, `/vaults` to browse strategies, and `/vaults/<address>` to deposit, withdraw, execute, and inspect metrics. MON deposits use native faucet MON and are wrapped into official WMON automatically. For tUSDC or tWETH deposits, use the in-app test-token faucet before approving. Wallet roles are derived on chain: the factory owner is the protocol admin, `vaultCreator` identifies the creator, and a nonzero share balance identifies an investor.
 
 The supplied Alchemy testnet RPC and Reown project ID live in the gitignored `apps/web/.env.local`. Copy `apps/web/.env.example` when setting up another machine.
 
@@ -76,19 +76,19 @@ pnpm contracts:test
 
 | Contract | Address |
 | --- | --- |
-| VaultFactory | `0x98e16DC22B67e09900f2769e4Dc062c2FB2C1fDf` |
-| DcaStrategyFactory | `0x4234A716040C9Bb93A9305CC97906887934ed4E1` |
-| ChainlinkOracleRegistry | `0xf1304127D9a554c00ad4ECAE0f5e1F284EA83241` |
-| DemoSwapAdapter | `0xda1Ad7b4a0E130d032b76CFA8a7C9E80B73Dcec8` |
-| Demo USDC | `0x5ceDd1Fd02d54E327e7E30a7e8D5096Fd722CD96` |
-| Demo WMON | `0xfd6771ffb66FFCB89569b50b66Ce90B7e83f8EC7` |
-| Demo WETH | `0x6eE714F8B322c7074Bc827D57685A0502e9c97CB` |
+| VaultFactory | `0x8947670a7C9147BA258234aE7FdEE6191e95fd1f` |
+| DcaStrategyFactory | `0xf96cb71BB6BC01312Afadab939aCCAd6531db9f6` |
+| ChainlinkOracleRegistry | `0x20EE4F01b31b4D2846Da3a436C3013785bDfC9Fd` |
+| InventorySwapAdapter | `0x4D7f5029f4154c7B998a69ea521C75E72d3e4C68` |
+| NativeDepositRouter | `0x00EA9027E3601608ab1B0A68b5753Fd2A4F2b82F` |
+| Test USDC | `0x37F8f050Bb677e588c60F4614D24CAe2d9a0B324` |
+| Official WMON | `0xFb8bf4c1CC7a94c73D209a149eA2AbEa852BC541` |
+| Test WETH | `0x9cF74BaFaabAeB901C7d88b195d72F6D497487e9` |
 | USDC/USD relay | `0xFfFf324649aB0D50eBeD4bb83c90fc7C5Cc7dac2` |
 | MON/USD relay | `0x910EB659119Eac93001e192f1B2Cc7c038A61CA5` |
 | ETH/USD relay | `0x0b406fB7F796B4387cdBa4815bCf7B6Ca46C56d6` |
-| Sample USDC → WMON vault | `0xc7EbAeC33A7c7384f86C24780Fcc65a5673De055` |
 
-The sample vault started with a 1,000-USDC deposit and has completed two 100-USDC DCA executions: the initial manual execution and an automated keeper execution. Local ignored env files already point the web app and keeper at this deployment.
+The replacement factory starts with no vaults so strategies created through the frontend belong to the connected creator. Local ignored env files already point the web app and keeper at this deployment.
 
 ### Production-style deployment
 
@@ -154,7 +154,7 @@ The worker simulates every due execution, estimates its gas, applies a 10% buffe
 ## MVP boundaries
 
 - Execution is permissionless but not incentivized yet; a keeper or user must call `executeDca`.
-- Demo tokens, relayed feeds, and `DemoSwapAdapter` are testnet-only and centrally administered. They make the full user journey deterministic; they must never be used with real value.
+- tUSDC, tWETH, relayed feeds, and `InventorySwapAdapter` are testnet-only and centrally administered. MON/WMON is the official testnet asset. The adapter mimics finite DEX liquidity and must never be used with real value.
 - Chainlink pricing and stale-round validation protect valuation and swap slippage, but deployment feed addresses and staleness thresholds must be reviewed carefully.
 - A withdrawal may unwind the entire target position to satisfy ERC-4626 liquidity. Oracle slippage protection is enforced, but a production version should add exact-output routing to avoid unnecessary position sales.
 - The contracts have unit tests, but they are unaudited and should only be used on testnet.

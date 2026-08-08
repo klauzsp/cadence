@@ -6,10 +6,13 @@
 - `strategies/dca/DcaStrategyFactory.sol`: decodes DCA configuration and deploys DCA vaults.
 - `strategies/dca/DcaVault.sol`: ERC-4626 vault with permissionless scheduled tranche execution.
 - `interfaces/ISwapAdapter.sol`: boundary for a reviewed, DEX-specific adapter.
+- `NativeDepositRouter.sol`: wraps native MON and deposits official WMON into compatible vaults.
 - `script/DeployProtocol.s.sol`: deploys the primary factory, DCA strategy factory, and registration.
 - `script/DeployDemoProtocol.s.sol`: deploys faucet tokens, Chainlink relay feeds, a deterministic adapter, and the complete testnet demo.
-- `demo/`: clearly marked test-only tokens, relayed feeds, and swap infrastructure.
+- `script/DeployHybridDemo.s.sol`: deploys official WMON, tUSDC/tWETH, and finite Chainlink-priced test liquidity.
+- `demo/`: clearly marked test-only tokens, relayed feeds, and finite-inventory swap infrastructure.
 - `test/VaultFactory.t.sol`: registry, allowlist, oracle, slippage, deposit, scheduling, valuation, and unwind tests.
+- `test/HybridDemo.t.sol`: native MON routing, finite inventory, and Chainlink-priced execution tests.
 
 Each strategy version has a stable ID, such as `keccak256("DCA_V1")`. The owner curates which strategy factories are registered; anyone can create a vault from a registered strategy. Adding Rebalance requires a new `IStrategyFactory`, not a new primary factory.
 

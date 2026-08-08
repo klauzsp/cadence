@@ -1,16 +1,31 @@
 import { isAddress, keccak256, parseAbi, toBytes, type Address } from "viem";
 
-function publicAddress(name: string, fallback?: Address): Address | undefined {
-  const configured = process.env[name];
+function publicAddress(configured?: string, fallback?: Address): Address | undefined {
   const value = configured && configured.length > 0 ? configured : fallback;
   return value && isAddress(value) ? value : undefined;
 }
 
-export const vaultFactoryAddress = publicAddress("NEXT_PUBLIC_VAULT_FACTORY_ADDRESS");
+export const vaultFactoryAddress = publicAddress(
+  process.env.NEXT_PUBLIC_VAULT_FACTORY_ADDRESS,
+);
+export const nativeDepositRouterAddress = publicAddress(
+  process.env.NEXT_PUBLIC_NATIVE_DEPOSIT_ROUTER_ADDRESS,
+);
 export const protocolDeploymentBlock = BigInt(
   process.env.NEXT_PUBLIC_PROTOCOL_DEPLOYMENT_BLOCK ?? "0",
 );
 export const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+export const explorerBaseUrl = (
+  process.env.NEXT_PUBLIC_MONAD_EXPLORER_URL ?? "https://testnet.monadscan.com"
+).replace(/\/$/, "");
+
+export function transactionExplorerUrl(hash: string) {
+  return `${explorerBaseUrl}/tx/${hash}`;
+}
+
+export function addressExplorerUrl(address: string) {
+  return `${explorerBaseUrl}/address/${address}`;
+}
 
 export const dcaStrategyId = keccak256(toBytes("DCA_V1"));
 
@@ -26,25 +41,31 @@ export const dcaConfigParameters = [
 
 const tokenDefinitions = [
   {
-    symbol: "USDC",
-    name: "USD Coin",
+    symbol: "tUSDC",
+    name: "Test USDC",
     decimals: 6,
-    fallback: "0x534b2f3A21130d7a60830c2Df862319e593943A3",
-    env: "NEXT_PUBLIC_USDC_ADDRESS",
+    isTestToken: true,
+    acceptsNative: false,
+    fallback: "0x37F8f050Bb677e588c60F4614D24CAe2d9a0B324",
+    configured: process.env.NEXT_PUBLIC_USDC_ADDRESS,
   },
   {
-    symbol: "WMON",
-    name: "Wrapped MON",
+    symbol: "MON",
+    name: "Monad",
     decimals: 18,
+    isTestToken: false,
+    acceptsNative: true,
     fallback: "0xFb8bf4c1CC7a94c73D209a149eA2AbEa852BC541",
-    env: "NEXT_PUBLIC_WMON_ADDRESS",
+    configured: process.env.NEXT_PUBLIC_WMON_ADDRESS,
   },
   {
-    symbol: "WETH",
-    name: "Wrapped Ether",
+    symbol: "tWETH",
+    name: "Test Wrapped Ether",
     decimals: 18,
-    fallback: "0x45477f4709771331db81944A5E20eF95Bc7BA2D7",
-    env: "NEXT_PUBLIC_WETH_ADDRESS",
+    isTestToken: true,
+    acceptsNative: false,
+    fallback: "0x9cF74BaFaabAeB901C7d88b195d72F6D497487e9",
+    configured: process.env.NEXT_PUBLIC_WETH_ADDRESS,
   },
 ] as const;
 
@@ -52,7 +73,9 @@ export const supportedTokens = tokenDefinitions.map((token) => ({
   symbol: token.symbol,
   name: token.name,
   decimals: token.decimals,
-  address: publicAddress(token.env, token.fallback as Address) as Address,
+  isTestToken: token.isTestToken,
+  acceptsNative: token.acceptsNative,
+  address: publicAddress(token.configured, token.fallback as Address) as Address,
 }));
 
 export function tokenDetails(address?: Address) {
@@ -112,6 +135,8 @@ export const vaultFactoryAbi = [
 ] as const;
 
 export const dcaVaultAbi = parseAbi([
+  "error ERC20InsufficientBalance(address sender, uint256 balance, uint256 needed)",
+  "error ERC20InsufficientAllowance(address spender, uint256 allowance, uint256 needed)",
   "function asset() view returns (address)",
   "function targetToken() view returns (address)",
   "function amountPerSwap() view returns (uint256)",
@@ -167,5 +192,18 @@ export const erc20Abi = [
     stateMutability: "nonpayable",
     inputs: [],
     outputs: [],
+  },
+] as const;
+
+export const nativeDepositRouterAbi = [
+  {
+    type: "function",
+    name: "deposit",
+    stateMutability: "payable",
+    inputs: [
+      { name: "vault", type: "address" },
+      { name: "receiver", type: "address" },
+    ],
+    outputs: [{ name: "shares", type: "uint256" }],
   },
 ] as const;

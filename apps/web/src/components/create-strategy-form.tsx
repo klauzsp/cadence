@@ -1,12 +1,15 @@
 "use client";
 
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 import Link from "next/link";
 import { useMemo, useState, type FormEvent } from "react";
-import { decodeEventLog, encodeAbiParameters, isAddress, parseUnits, type Address } from "viem";
-import { useAccount, usePublicClient, useWalletClient } from "wagmi";
+import { BaseError, decodeEventLog, encodeAbiParameters, isAddress, parseUnits, type Address } from "viem";
+import { useAccount, usePublicClient, useSwitchChain, useWalletClient } from "wagmi";
+import { monadTestnet } from "wagmi/chains";
 import {
   dcaConfigParameters,
   dcaStrategyId,
+  transactionExplorerUrl,
   isDemoMode,
   supportedTokens,
   tokenDetails,
@@ -22,13 +25,14 @@ const frequencies = [
 ];
 
 export function CreateStrategyForm() {
-  const { isConnected } = useAccount();
-  const { address: account } = useAccount();
+  const { address: account, chainId, isConnected } = useAccount();
+  const { openConnectModal } = useConnectModal();
+  const { isPending: isSwitchingChain, switchChain } = useSwitchChain();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
   const [asset, setAsset] = useState<Address>(supportedTokens[0].address);
   const [target, setTarget] = useState<Address>(supportedTokens[2].address);
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(isDemoMode ? "100" : "");
   const [frequency, setFrequency] = useState(frequencies[isDemoMode ? 0 : 2].seconds);
   const [maxSlippage, setMaxSlippage] = useState("1");
   const [name, setName] = useState("My DCA Strategy");
@@ -36,12 +40,14 @@ export function CreateStrategyForm() {
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string>();
   const [createdVault, setCreatedVault] = useState<Address>();
+  const [createdTransaction, setCreatedTransaction] = useState<`0x${string}`>();
 
   const decimals = tokenDetails(asset)?.decimals;
 
   const canSubmit = useMemo(
     () =>
       isConnected &&
+      chainId === monadTestnet.id &&
       Boolean(vaultFactoryAddress) &&
       isAddress(asset) &&
       isAddress(target) &&
@@ -52,8 +58,22 @@ export function CreateStrategyForm() {
       decimals !== undefined &&
       name.length > 0 &&
       symbol.length > 0,
-    [amount, asset, decimals, isConnected, maxSlippage, name, symbol, target],
+    [amount, asset, chainId, decimals, isConnected, maxSlippage, name, symbol, target],
   );
+
+  const submitHint = !isConnected
+    ? "Connect your wallet above to create a strategy."
+    : chainId !== monadTestnet.id
+      ? "Switch your wallet to Monad testnet."
+      : asset.toLowerCase() === target.toLowerCase()
+        ? "Deposit and target tokens must be different."
+        : !Number.isFinite(Number(amount)) || Number(amount) <= 0
+          ? "Enter an amount greater than zero."
+          : !Number.isFinite(Number(maxSlippage)) || Number(maxSlippage) < 0 || Number(maxSlippage) > 10
+            ? "Max slippage must be between 0% and 10%."
+            : !name.trim() || !symbol.trim()
+              ? "Enter a vault name and share symbol."
+              : undefined;
 
   async function createStrategy(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -62,6 +82,7 @@ export function CreateStrategyForm() {
     setIsPending(true);
     setError(undefined);
     setCreatedVault(undefined);
+    setCreatedTransaction(undefined);
 
     const initData = encodeAbiParameters(dcaConfigParameters, [
       asset as Address,
@@ -87,6 +108,7 @@ export function CreateStrategyForm() {
         gas: estimate + estimate / 10n,
       });
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      setCreatedTransaction(hash);
 
       for (const log of receipt.logs) {
         try {
@@ -104,7 +126,13 @@ export function CreateStrategyForm() {
         }
       }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Strategy creation failed");
+      setError(
+        caught instanceof BaseError
+          ? caught.shortMessage
+          : caught instanceof Error
+            ? caught.message
+            : "Strategy creation failed",
+      );
     } finally {
       setIsPending(false);
     }
@@ -130,7 +158,11 @@ export function CreateStrategyForm() {
           Deposit token
           <select
             value={asset}
-            onChange={(event) => setAsset(event.target.value as Address)}
+            onChange={(event) => {
+              const nextAsset = event.target.value as Address;
+              setAsset(nextAsset);
+              setAmount(tokenDetails(nextAsset)?.acceptsNative ? "0.01" : tokenDetails(nextAsset)?.decimals === 6 ? "100" : "0.01");
+            }}
           >
             {supportedTokens.map((token) => (
               <option key={token.address} value={token.address}>
@@ -201,17 +233,39 @@ export function CreateStrategyForm() {
           Deploy the protocol, then set <code>NEXT_PUBLIC_VAULT_FACTORY_ADDRESS</code>.
         </p>
       )}
-      <p className="form-note">Supported assets: USDC, wrapped MON, and wrapped ETH.</p>
+      <p className="form-note">MON is official testnet MON, wrapped automatically. tUSDC and tWETH are test assets with Chainlink pricing.</p>
+      {tokenDetails(target)?.acceptsNative && (
+        <p className="form-note">MON-target strategies share a deliberately small 0.1-WMON demo inventory, so use small tranches.</p>
+      )}
+      {submitHint && <p className="form-note">{submitHint}</p>}
       {error && <p className="form-error">{error}</p>}
       {createdVault && (
         <p className="form-success">
-          Strategy created. <Link href={`/vaults/${createdVault}`}>Open its dashboard →</Link>
+          Strategy created. <Link href={`/vaults/${createdVault}`}>Open dashboard</Link>
+          {createdTransaction && (
+            <> · <a href={transactionExplorerUrl(createdTransaction)} rel="noreferrer" target="_blank">View transaction ↗</a></>
+          )}
         </p>
       )}
 
-      <button className="submit-button" disabled={!canSubmit || isPending}>
+      <button
+        className="submit-button"
+        disabled={isPending || isSwitchingChain || (isConnected && chainId === monadTestnet.id && !canSubmit)}
+        onClick={
+          !isConnected
+            ? openConnectModal
+            : chainId !== monadTestnet.id
+              ? () => switchChain({ chainId: monadTestnet.id })
+              : undefined
+        }
+        type={isConnected && chainId === monadTestnet.id ? "submit" : "button"}
+      >
         {!isConnected
-          ? "Connect wallet to continue"
+          ? "Connect wallet and create"
+          : chainId !== monadTestnet.id
+            ? isSwitchingChain
+              ? "Switching network…"
+              : "Switch to Monad testnet"
           : isPending
             ? "Confirm in wallet…"
             : "Create DCA strategy"}
