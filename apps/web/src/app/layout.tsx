@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Cadence — Automated strategies on Monad",
-  description: "Create transparent, automated ERC-4626 investment strategies.",
+  description: "Create transparent, automated investment strategies on Monad.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

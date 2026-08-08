@@ -6,9 +6,9 @@ export default function VaultsPage() {
     <main>
       <AppNav />
       <section className="dashboard-header">
-        <p className="eyebrow">Onchain strategies</p>
-        <h1>Vaults.</h1>
-        <p>Explore every strategy, then inspect your creator and investor positions.</p>
+        <p className="eyebrow">Live standings</p>
+        <h1>Vault leaderboard.</h1>
+        <p>Strategies compete for the top spot. Rankings update from live TVL on Monad.</p>
       </section>
       <VaultList />
     </main>

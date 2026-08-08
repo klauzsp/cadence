@@ -8,42 +8,38 @@ export default function Home() {
 
       <section className="hero" id="top">
         <div className="hero-copy">
-          <p className="eyebrow"><span aria-hidden="true">✦</span> Open strategy infrastructure</p>
+          <p className="eyebrow"></p>
           <h1>
-            Automated investing,
-            <span> open to everyone.</span>
+            Deploy a strategy
+            <span>Attract capital</span>
           </h1>
           <p className="hero-text">
-            Create transparent ERC-4626 strategies on Monad. Choose DCA or
-            threshold rebalancing, invite deposits, and let permissionless
-            automation handle execution.
+            Create permissionless, transparent investment strategies strategies
+            on Monad.
           </p>
-          <div className="principles">
-            <span>Permissionless creation</span>
-            <span>Onchain execution</span>
-            <span>Non-custodial shares</span>
-          </div>
         </div>
         <CreateStrategyForm />
       </section>
 
       <section className="how-it-works">
-        <p className="eyebrow">Two strategies. One permissionless factory.</p>
+        <p className="eyebrow">How it works</p>
         <div className="steps">
           <article>
             <span>01</span>
-            <h3>Choose the pair</h3>
-            <p>Select the asset your vault accepts and the token it accumulates.</p>
+            <h3>Select your strategy</h3>
+            <p>
+              Choose your strategy, such as dollar cost averaging every minute.
+            </p>
           </article>
           <article>
             <span>02</span>
             <h3>Set the logic</h3>
-            <p>Choose a DCA schedule or a target allocation with a drift threshold.</p>
+            <p>Define what makes your strategy unique</p>
           </article>
           <article>
             <span>03</span>
             <h3>Deposit and own</h3>
-            <p>Depositors receive standard vault shares representing their position.</p>
+            <p>Deposit and own shares in the vault position.</p>
           </article>
         </div>
       </section>

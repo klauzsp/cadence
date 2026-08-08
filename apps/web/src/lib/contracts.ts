@@ -53,8 +53,8 @@ export const rebalanceConfigParameters = [
 
 const tokenDefinitions = [
   {
-    symbol: "tUSDC",
-    name: "Test USDC",
+    symbol: "USDC",
+    name: "USDC",
     decimals: 6,
     isTestToken: true,
     acceptsNative: false,
@@ -62,7 +62,7 @@ const tokenDefinitions = [
     configured: process.env.NEXT_PUBLIC_USDC_ADDRESS,
   },
   {
-    symbol: "MON",
+    symbol: "Monad",
     name: "Monad",
     decimals: 18,
     isTestToken: false,
@@ -71,8 +71,8 @@ const tokenDefinitions = [
     configured: process.env.NEXT_PUBLIC_WMON_ADDRESS,
   },
   {
-    symbol: "tWETH",
-    name: "Test Wrapped Ether",
+    symbol: "WETH",
+    name: "WETH",
     decimals: 18,
     isTestToken: true,
     acceptsNative: false,

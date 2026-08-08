@@ -298,7 +298,7 @@ export function VaultDashboard({ vault }: { vault: Address }) {
         const estimate = await publicClient.estimateContractGas(request);
         hash = await walletClient.writeContract({ ...request, gas: addGasBuffer(estimate) });
       } else if (action === "nativeDeposit") {
-        if (!nativeDepositRouterAddress) throw new Error("Native MON deposits are not configured");
+        if (!nativeDepositRouterAddress) throw new Error("Native Monad deposits are not configured");
         const { request } = await publicClient.simulateContract({
           account,
           address: nativeDepositRouterAddress,
@@ -386,7 +386,7 @@ export function VaultDashboard({ vault }: { vault: Address }) {
 
       {isDemoMode && (
         <div className="demo-banner">
-          Hybrid demo: MON uses official WMON. tUSDC, tWETH, and the finite-liquidity swap venue are test-only; prices come from Chainlink.
+          Hybrid demo: Monad uses the official wrapped Monad token. USDC, WETH, and the finite-liquidity swap venue are test-only; prices come from Chainlink.
         </div>
       )}
 
@@ -397,7 +397,6 @@ export function VaultDashboard({ vault }: { vault: Address }) {
         <Metric label="Your position" value={`${userPositionValue.toFixed(4)} ${assetToken?.symbol ?? ""}`} />
         <Metric label="Your vault ownership" value={isConnected ? `${ownershipPercent.toFixed(2)}%` : "Connect wallet"} />
         <Metric label={isRebalance ? "Target allocation" : "Invested allocation"} value={isRebalance ? `${((targetAllocationBps ?? 0) / 100).toFixed(1)}%` : `${investedPercent.toFixed(1)}%`} />
-        <Metric label="Executions" value={displayedExecutionCount?.toString() ?? "0"} />
       </section>
       <p className="metric-explanation">
         Return is measured in {assetToken?.symbol ?? "the deposit asset"} and includes execution spread plus price movement of the held {targetToken?.symbol ?? "target token"}.
@@ -405,7 +404,6 @@ export function VaultDashboard({ vault }: { vault: Address }) {
 
       <section className="vault-layout">
         <div className="panel">
-          <p className="eyebrow">Investor actions</p>
           <h2>Fund your position</h2>
           <p className="balance-line">
             Wallet balance: {formatAmount(depositSourceBalance, assetDecimals)} {assetToken?.symbol}
@@ -427,7 +425,7 @@ export function VaultDashboard({ vault }: { vault: Address }) {
           )}
           {acceptsNative ? (
             <button className="primary-button full" disabled={!isConnected || depositUnits === 0n || !hasDepositBalance || Boolean(pendingAction)} onClick={() => runAction("nativeDeposit")}>
-              {pendingAction === "nativeDeposit" ? "Wrapping and depositing…" : "Deposit MON"}
+              {pendingAction === "nativeDeposit" ? "Wrapping and depositing…" : "Deposit Monad"}
             </button>
           ) : (
             <div className="action-row">
@@ -448,7 +446,7 @@ export function VaultDashboard({ vault }: { vault: Address }) {
           <button className="secondary-button full" disabled={!isInvestor || withdrawUnits === 0n || Boolean(pendingAction)} onClick={() => runAction("withdraw")}>
             {pendingAction === "withdraw" ? "Withdrawing…" : "Withdraw"}
           </button>
-          {acceptsNative && <p className="form-note">Withdrawals return official WMON, which can be unwrapped 1:1 to MON.</p>}
+          {acceptsNative && <p className="form-note">Withdrawals return wrapped Monad, which can be unwrapped 1:1 to Monad.</p>}
           {actionError && <p className="form-error">{actionError}</p>}
           {transactionHash && (
             <p className="form-success">
@@ -458,9 +456,9 @@ export function VaultDashboard({ vault }: { vault: Address }) {
         </div>
 
         <div className="panel">
-          <p className="eyebrow">Automation</p>
           <h2>Execution status</h2>
           <dl className="detail-list">
+            <div><dt>Executions</dt><dd>{displayedExecutionCount?.toString() ?? "0"}</dd></div>
             {isRebalance ? (
               <>
                 <div><dt>Current target allocation</dt><dd>{(Number(currentAllocationBps ?? 0n) / 100).toFixed(2)}%</dd></div>

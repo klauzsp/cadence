@@ -44,13 +44,41 @@ export function VaultList() {
     contracts: vaultContracts,
     query: { enabled: Boolean(vaultFactoryAddress && vaultContracts.length) },
   });
-  const vaults = (vaultResults ?? [])
-    .map((result) => result.result as Address | undefined)
-    .filter((vault): vault is Address => Boolean(vault));
-
-  const isAdmin = Boolean(
-    account && owner && account.toLowerCase() === owner.toLowerCase(),
+  const vaults = useMemo(
+    () =>
+      (vaultResults ?? [])
+        .map((result) => result.result as Address | undefined)
+        .filter((vault): vault is Address => Boolean(vault)),
+    [vaultResults],
   );
+
+  const rankingContracts = useMemo(
+    () =>
+      vaults.flatMap((vault) => [
+        { address: vault, abi: dcaVaultAbi, functionName: "asset" as const },
+        { address: vault, abi: dcaVaultAbi, functionName: "totalAssets" as const },
+      ]),
+    [vaults],
+  );
+  const { data: rankingResults, isLoading: isRanking } = useReadContracts({
+    contracts: rankingContracts,
+    query: { enabled: rankingContracts.length > 0 },
+  });
+
+  const rankedVaults = useMemo(
+    () =>
+      vaults
+        .map((vault, index) => {
+          const asset = rankingResults?.[index * 2].result as Address | undefined;
+          const totalAssets = (rankingResults?.[index * 2 + 1].result as bigint | undefined) ?? 0n;
+          const tvl = Number(formatUnits(totalAssets, tokenDetails(asset)?.decimals ?? 18));
+          return { vault, tvl };
+        })
+        .sort((a, b) => b.tvl - a.tvl),
+    [rankingResults, vaults],
+  );
+
+  const isAdmin = Boolean(account && owner && account.toLowerCase() === owner.toLowerCase());
 
   if (!vaultFactoryAddress) {
     return <p className="empty-state">The protocol has not been deployed yet.</p>;
@@ -61,11 +89,7 @@ export function VaultList() {
       <div className="dashboard-toolbar">
         <div className="filter-tabs">
           {(["all", "created", "invested"] as const).map((value) => (
-            <button
-              className={filter === value ? "active" : ""}
-              key={value}
-              onClick={() => setFilter(value)}
-            >
+            <button className={filter === value ? "active" : ""} key={value} onClick={() => setFilter(value)}>
               {value === "all" ? "All vaults" : value === "created" ? "Created by me" : "My investments"}
             </button>
           ))}
@@ -73,14 +97,14 @@ export function VaultList() {
         {isAdmin && <span className="role-badge admin">Protocol admin</span>}
       </div>
 
-      {isLoading ? (
-        <p className="empty-state">Loading vaults…</p>
-      ) : vaults.length === 0 ? (
+      {isLoading || isRanking ? (
+        <p className="empty-state">Ranking vaults…</p>
+      ) : rankedVaults.length === 0 ? (
         <p className="empty-state">No strategies yet. Create the first one.</p>
       ) : (
         <div className="vault-grid">
-          {vaults.map((vault) => (
-            <VaultCard account={account} filter={filter} key={vault} vault={vault} />
+          {rankedVaults.map(({ vault }, index) => (
+            <VaultCard account={account} filter={filter} key={vault} rank={index + 1} vault={vault} />
           ))}
         </div>
       )}
@@ -91,10 +115,12 @@ export function VaultList() {
 function VaultCard({
   account,
   filter,
+  rank,
   vault,
 }: {
   account?: Address;
   filter: Filter;
+  rank: number;
   vault: Address;
 }) {
   const { data } = useReadContracts({
@@ -140,9 +166,7 @@ function VaultCard({
   const isRebalance = strategyId === rebalanceStrategyId;
   const assetToken = tokenDetails(asset);
   const targetToken = tokenDetails(target);
-  const isCreator = Boolean(
-    account && creator && account.toLowerCase() === creator.toLowerCase(),
-  );
+  const isCreator = Boolean(account && creator && account.toLowerCase() === creator.toLowerCase());
   const isInvestor = Boolean(userShares && userShares > 0n);
 
   if (filter === "created" && !isCreator) return null;
@@ -152,22 +176,31 @@ function VaultCard({
   const assets = Number(formatUnits(totalAssets ?? 0n, decimals));
   const shares = Number(formatUnits(totalSupply ?? 0n, decimals));
   const sharePrice = shares > 0 ? assets / shares : 1;
+  const rankLabel = rank === 1 ? "Champion" : rank <= 3 ? "Podium" : "Rank";
 
   return (
-    <Link className="vault-card" href={`/vaults/${vault}`}>
-      <div className="vault-card-topline">
-        <span className="strategy-pill">{isRebalance ? "Rebalance" : "DCA"}</span>
-        <div className="role-badges">
-          {isCreator && <span className="role-badge">Creator</span>}
-          {isInvestor && <span className="role-badge investor">Investor</span>}
-        </div>
+    <Link className={`vault-card leaderboard-row rank-${Math.min(rank, 4)}`} href={`/vaults/${vault}`}>
+      <div className="vault-ranking">
+        <span className="rank-badge">#{rank}</span>
+        <small>{rankLabel}</small>
       </div>
-      <h2>{name ?? "Loading strategy…"}</h2>
-      <p className="vault-symbol">{symbol ?? "—"}</p>
-      <div className="pair-line">
-        <strong>{assetToken?.symbol ?? "Asset"}</strong>
-        <span>→</span>
-        <strong>{targetToken?.symbol ?? "Target"}</strong>
+      <div className="vault-overview">
+        <div className="vault-card-topline">
+          <span className="strategy-pill">{isRebalance ? "Rebalance" : "DCA"}</span>
+          <div className="role-badges">
+            {isCreator && <span className="role-badge">Creator</span>}
+            {isInvestor && <span className="role-badge investor">Investor</span>}
+          </div>
+        </div>
+        <h2>{name ?? "Loading strategy…"}</h2>
+        <div className="vault-row-meta">
+          <span>{symbol ?? "—"}</span>
+          <div className="pair-line">
+            <strong>{assetToken?.symbol ?? "Asset"}</strong>
+            <span>→</span>
+            <strong>{targetToken?.symbol ?? "Target"}</strong>
+          </div>
+        </div>
       </div>
       <div className="card-metrics">
         <div>
@@ -183,6 +216,7 @@ function VaultCard({
           <strong>{executions?.toString() ?? "0"}</strong>
         </div>
       </div>
+      <span className="vault-row-arrow" aria-hidden="true">↗</span>
     </Link>
   );
 }

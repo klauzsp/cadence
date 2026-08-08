@@ -3,8 +3,20 @@
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import Link from "next/link";
 import { useMemo, useState, type FormEvent } from "react";
-import { BaseError, decodeEventLog, encodeAbiParameters, isAddress, parseUnits, type Address } from "viem";
-import { useAccount, usePublicClient, useSwitchChain, useWalletClient } from "wagmi";
+import {
+  BaseError,
+  decodeEventLog,
+  encodeAbiParameters,
+  isAddress,
+  parseUnits,
+  type Address,
+} from "viem";
+import {
+  useAccount,
+  usePublicClient,
+  useSwitchChain,
+  useWalletClient,
+} from "wagmi";
 import { monadTestnet } from "wagmi/chains";
 import {
   dcaConfigParameters,
@@ -25,6 +37,7 @@ const frequencies = [
   { label: "Every day", seconds: 86_400 },
   { label: "Every week", seconds: 604_800 },
 ];
+const maxSlippageBps = 100;
 
 export function CreateStrategyForm() {
   const { address: account, chainId, isConnected } = useAccount();
@@ -36,8 +49,9 @@ export function CreateStrategyForm() {
   const [asset, setAsset] = useState<Address>(supportedTokens[0].address);
   const [target, setTarget] = useState<Address>(supportedTokens[2].address);
   const [amount, setAmount] = useState(isDemoMode ? "100" : "");
-  const [frequency, setFrequency] = useState(frequencies[isDemoMode ? 0 : 2].seconds);
-  const [maxSlippage, setMaxSlippage] = useState("1");
+  const [frequency, setFrequency] = useState(
+    frequencies[isDemoMode ? 0 : 2].seconds,
+  );
   const [targetAllocation, setTargetAllocation] = useState("50");
   const [threshold, setThreshold] = useState("5");
   const [name, setName] = useState("My DCA Strategy");
@@ -58,19 +72,28 @@ export function CreateStrategyForm() {
       isAddress(target) &&
       asset.toLowerCase() !== target.toLowerCase() &&
       (strategy === "rebalance" || Number(amount) > 0) &&
-      (strategy === "dca" || (
-        Number(targetAllocation) > 0 &&
-        Number(targetAllocation) < 100 &&
-        Number(threshold) > 0 &&
-        Number(threshold) < Number(targetAllocation) &&
-        Number(targetAllocation) + Number(threshold) < 100
-      )) &&
-      Number(maxSlippage) >= 0 &&
-      Number(maxSlippage) <= 10 &&
+      (strategy === "dca" ||
+        (Number(targetAllocation) > 0 &&
+          Number(targetAllocation) < 100 &&
+          Number(threshold) > 0 &&
+          Number(threshold) < Number(targetAllocation) &&
+          Number(targetAllocation) + Number(threshold) < 100)) &&
       decimals !== undefined &&
       name.length > 0 &&
       symbol.length > 0,
-    [amount, asset, chainId, decimals, isConnected, maxSlippage, name, strategy, symbol, target, targetAllocation, threshold],
+    [
+      amount,
+      asset,
+      chainId,
+      decimals,
+      isConnected,
+      name,
+      strategy,
+      symbol,
+      target,
+      targetAllocation,
+      threshold,
+    ],
   );
 
   const submitHint = !isConnected
@@ -79,59 +102,68 @@ export function CreateStrategyForm() {
       ? "Switch your wallet to Monad testnet."
       : asset.toLowerCase() === target.toLowerCase()
         ? "Deposit and target tokens must be different."
-        : strategy === "dca" && (!Number.isFinite(Number(amount)) || Number(amount) <= 0)
+        : strategy === "dca" &&
+            (!Number.isFinite(Number(amount)) || Number(amount) <= 0)
           ? "Enter an amount greater than zero."
-          : strategy === "rebalance" && (
-              !Number.isFinite(Number(targetAllocation)) ||
-              !Number.isFinite(Number(threshold)) ||
-              Number(targetAllocation) <= 0 ||
-              Number(targetAllocation) >= 100 ||
-              Number(threshold) <= 0 ||
-              Number(threshold) >= Number(targetAllocation) ||
-              Number(targetAllocation) + Number(threshold) >= 100
-            )
+          : strategy === "rebalance" &&
+              (!Number.isFinite(Number(targetAllocation)) ||
+                !Number.isFinite(Number(threshold)) ||
+                Number(targetAllocation) <= 0 ||
+                Number(targetAllocation) >= 100 ||
+                Number(threshold) <= 0 ||
+                Number(threshold) >= Number(targetAllocation) ||
+                Number(targetAllocation) + Number(threshold) >= 100)
             ? "Choose a valid target and drift band that stay between 0% and 100%."
-          : !Number.isFinite(Number(maxSlippage)) || Number(maxSlippage) < 0 || Number(maxSlippage) > 10
-            ? "Max slippage must be between 0% and 10%."
             : !name.trim() || !symbol.trim()
               ? "Enter a vault name and share symbol."
               : undefined;
 
   function selectStrategy(nextStrategy: "dca" | "rebalance") {
     setStrategy(nextStrategy);
-    setName(nextStrategy === "dca" ? "My DCA Strategy" : "My Balanced Strategy");
+    setName(
+      nextStrategy === "dca" ? "My DCA Strategy" : "My Balanced Strategy",
+    );
     setSymbol(nextStrategy === "dca" ? "DCA" : "BAL");
   }
 
   async function createStrategy(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canSubmit || !vaultFactoryAddress || decimals === undefined || !account || !publicClient || !walletClient) return;
+    if (
+      !canSubmit ||
+      !vaultFactoryAddress ||
+      decimals === undefined ||
+      !account ||
+      !publicClient ||
+      !walletClient
+    )
+      return;
 
     setIsPending(true);
     setError(undefined);
     setCreatedVault(undefined);
     setCreatedTransaction(undefined);
 
-    const initData = strategy === "dca"
-      ? encodeAbiParameters(dcaConfigParameters, [
-          asset as Address,
-          target as Address,
-          parseUnits(amount, decimals),
-          BigInt(frequency),
-          Math.round(Number(maxSlippage) * 100),
-          name,
-          symbol,
-        ])
-      : encodeAbiParameters(rebalanceConfigParameters, [
-          asset as Address,
-          target as Address,
-          Math.round(Number(targetAllocation) * 100),
-          Math.round(Number(threshold) * 100),
-          BigInt(frequency),
-          Math.round(Number(maxSlippage) * 100),
-          name,
-          symbol,
-        ]);
+    const initData =
+      strategy === "dca"
+        ? encodeAbiParameters(dcaConfigParameters, [
+            asset as Address,
+            target as Address,
+            parseUnits(amount, decimals),
+            BigInt(frequency),
+            maxSlippageBps,
+            name,
+            symbol,
+          ])
+        : encodeAbiParameters(rebalanceConfigParameters, [
+            asset as Address,
+            target as Address,
+            Math.round(Number(targetAllocation) * 100),
+            Math.round(Number(threshold) * 100),
+            BigInt(frequency),
+            maxSlippageBps,
+            name,
+            symbol,
+          ]);
 
     try {
       const { request } = await publicClient.simulateContract({
@@ -139,7 +171,10 @@ export function CreateStrategyForm() {
         address: vaultFactoryAddress,
         abi: vaultFactoryAbi,
         functionName: "createVault",
-        args: [strategy === "dca" ? dcaStrategyId : rebalanceStrategyId, initData],
+        args: [
+          strategy === "dca" ? dcaStrategyId : rebalanceStrategyId,
+          initData,
+        ],
       });
       const estimate = await publicClient.estimateContractGas(request);
       const hash = await walletClient.writeContract({
@@ -184,17 +219,24 @@ export function CreateStrategyForm() {
           <p className="eyebrow">New vault</p>
           <h2>Build your strategy</h2>
         </div>
-        <span className="strategy-pill">ERC-4626</span>
       </div>
 
       <fieldset className="strategy-choice">
         <legend>Strategy type</legend>
         <div className="strategy-toggle">
-          <button aria-pressed={strategy === "dca"} onClick={() => selectStrategy("dca")} type="button">
+          <button
+            aria-pressed={strategy === "dca"}
+            onClick={() => selectStrategy("dca")}
+            type="button"
+          >
             <span>DCA</span>
             Fixed purchases
           </button>
-          <button aria-pressed={strategy === "rebalance"} onClick={() => selectStrategy("rebalance")} type="button">
+          <button
+            aria-pressed={strategy === "rebalance"}
+            onClick={() => selectStrategy("rebalance")}
+            type="button"
+          >
             <span>Rebalance</span>
             Allocation band
           </button>
@@ -204,7 +246,10 @@ export function CreateStrategyForm() {
       <div className="field-row metadata-row">
         <label>
           Vault name
-          <input value={name} onChange={(event) => setName(event.target.value)} />
+          <input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
         </label>
         <label>
           Share symbol
@@ -224,12 +269,18 @@ export function CreateStrategyForm() {
             onChange={(event) => {
               const nextAsset = event.target.value as Address;
               setAsset(nextAsset);
-              setAmount(tokenDetails(nextAsset)?.acceptsNative ? "0.01" : tokenDetails(nextAsset)?.decimals === 6 ? "100" : "0.01");
+              setAmount(
+                tokenDetails(nextAsset)?.acceptsNative
+                  ? "0.01"
+                  : tokenDetails(nextAsset)?.decimals === 6
+                    ? "100"
+                    : "0.01",
+              );
             }}
           >
             {supportedTokens.map((token) => (
               <option key={token.address} value={token.address}>
-                {token.symbol} — {token.name}
+                {token.name}
               </option>
             ))}
           </select>
@@ -242,7 +293,7 @@ export function CreateStrategyForm() {
           >
             {supportedTokens.map((token) => (
               <option key={token.address} value={token.address}>
-                {token.symbol} — {token.name}
+                {token.name}
               </option>
             ))}
           </select>
@@ -261,16 +312,24 @@ export function CreateStrategyForm() {
             />
           </label>
         ) : (
-          <>
+          <div className="allocation-inputs">
             <label>
-              Target allocation ({tokenDetails(target)?.symbol}, %)
-              <input inputMode="decimal" value={targetAllocation} onChange={(event) => setTargetAllocation(event.target.value)} />
+              Target %
+              <input
+                inputMode="decimal"
+                value={targetAllocation}
+                onChange={(event) => setTargetAllocation(event.target.value)}
+              />
             </label>
             <label>
-              Drift threshold (%)
-              <input inputMode="decimal" value={threshold} onChange={(event) => setThreshold(event.target.value)} />
+              Drift %
+              <input
+                inputMode="decimal"
+                value={threshold}
+                onChange={(event) => setThreshold(event.target.value)}
+              />
             </label>
-          </>
+          </div>
         )}
         <label>
           {strategy === "dca" ? "Frequency" : "Minimum interval"}
@@ -285,26 +344,12 @@ export function CreateStrategyForm() {
             ))}
           </select>
         </label>
-        <label>
-          Max slippage
-          <input
-            inputMode="decimal"
-            value={maxSlippage}
-            onChange={(event) => setMaxSlippage(event.target.value)}
-            placeholder="1"
-          />
-        </label>
-        {strategy === "dca" && (
-          <div className="parameter-info">
-            <span>Trigger</span>
-            <strong>Time based</strong>
-          </div>
-        )}
       </div>
 
       {!vaultFactoryAddress && (
         <p className="form-note">
-          Deploy the protocol, then set <code>NEXT_PUBLIC_VAULT_FACTORY_ADDRESS</code>.
+          Deploy the protocol, then set{" "}
+          <code>NEXT_PUBLIC_VAULT_FACTORY_ADDRESS</code>.
         </p>
       )}
       <div className="form-context">
@@ -314,24 +359,42 @@ export function CreateStrategyForm() {
             : "Trades execute only when allocation leaves the selected band."}
         </p>
         <p className="form-note">
-          MON is official testnet MON; tUSDC and tWETH are Chainlink-priced test assets.
-          {(tokenDetails(asset)?.acceptsNative || tokenDetails(target)?.acceptsNative) && " Keep MON-involving vaults small."}
+          Monad is the official testnet asset; USDC and WETH are Chainlink-priced test
+          assets.
+          {(tokenDetails(asset)?.acceptsNative ||
+            tokenDetails(target)?.acceptsNative) &&
+            " Keep Monad-involving vaults small."}
         </p>
       </div>
       {submitHint && <p className="form-note">{submitHint}</p>}
       {error && <p className="form-error">{error}</p>}
       {createdVault && (
         <p className="form-success">
-          Strategy created. <Link href={`/vaults/${createdVault}`}>Open dashboard</Link>
+          Strategy created.{" "}
+          <Link href={`/vaults/${createdVault}`}>Open dashboard</Link>
           {createdTransaction && (
-            <> · <a href={transactionExplorerUrl(createdTransaction)} rel="noreferrer" target="_blank">View transaction ↗</a></>
+            <>
+              {" "}
+              ·{" "}
+              <a
+                href={transactionExplorerUrl(createdTransaction)}
+                rel="noreferrer"
+                target="_blank"
+              >
+                View transaction ↗
+              </a>
+            </>
           )}
         </p>
       )}
 
       <button
         className="submit-button"
-        disabled={isPending || isSwitchingChain || (isConnected && chainId === monadTestnet.id && !canSubmit)}
+        disabled={
+          isPending ||
+          isSwitchingChain ||
+          (isConnected && chainId === monadTestnet.id && !canSubmit)
+        }
         onClick={
           !isConnected
             ? openConnectModal
@@ -347,9 +410,11 @@ export function CreateStrategyForm() {
             ? isSwitchingChain
               ? "Switching network…"
               : "Switch to Monad testnet"
-          : isPending
-            ? "Confirm in wallet…"
-            : strategy === "dca" ? "Create DCA strategy" : "Create rebalance strategy"}
+            : isPending
+              ? "Confirm in wallet…"
+              : strategy === "dca"
+                ? "Create DCA strategy"
+                : "Create rebalance strategy"}
       </button>
     </form>
   );

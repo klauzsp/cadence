@@ -2,7 +2,7 @@
 
 :root {
   --brand-black: #101014;
-  --brand-purple: #5823f3;
+  --brand-accent: #d14200;
   --brand-magenta: #fa43bd;
   --brand-orange: #ff895d;
   --brand-yellow: #ffcd4d;
@@ -19,7 +19,7 @@
   --white: #ffffff;
   --line: rgba(35, 35, 43, 0.12);
   --primary-gradient: linear-gradient(100deg, #fa43bd 0%, #ff895d 58%, #ffcd4d 115%);
-  --purple-gradient: linear-gradient(105deg, #7a6bff, #bddeff 76%, #ffffff);
+  --sunset-gradient: linear-gradient(105deg, #fa43bd, #ff895d 58%, #ffe6a4);
   --warm-gradient: linear-gradient(105deg, #ff895d, #ffe6a4 76%, #ffffff);
   --magenta-gradient: linear-gradient(105deg, #fa43bd, #ffb5b5 76%, #ffffff);
   --display: "Roobert", "Inter", Arial, Helvetica, sans-serif;
@@ -114,24 +114,35 @@ nav {
 }
 
 .nav-links {
-  gap: 8px;
+  gap: 4px;
   margin-left: auto;
   margin-right: 30px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: 0 8px 24px rgba(35, 35, 43, 0.05);
 }
 
 .nav-links a {
-  padding: 10px 14px;
+  padding: 11px 19px;
   border-radius: 999px;
   color: var(--gray-70);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   text-decoration: none;
-  transition: color 150ms, background 150ms;
+  transition: color 150ms, background 150ms, transform 150ms;
 }
 
 .nav-links a:hover {
-  color: var(--brand-purple);
-  background: rgba(88, 35, 243, 0.07);
+  color: var(--brand-black);
+  background: #ffe4d6;
+}
+
+.nav-links a.active {
+  color: var(--brand-black);
+  background: var(--primary-gradient);
 }
 
 .network-status {
@@ -181,7 +192,7 @@ nav {
 
 .eyebrow {
   margin: 0 0 18px;
-  color: var(--brand-purple);
+  color: var(--brand-accent);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.11em;
@@ -293,8 +304,8 @@ h2 {
 
 .strategy-pill {
   padding: 8px 11px;
-  color: var(--brand-purple);
-  background: #e5e5ff;
+  color: #8c3100;
+  background: #ffe4d6;
 }
 
 .strategy-choice {
@@ -348,13 +359,13 @@ h2 {
 }
 
 .strategy-toggle button[aria-pressed="true"] {
-  color: var(--brand-purple);
+  color: var(--brand-accent);
   background: #fff;
   box-shadow: 0 4px 14px rgba(35, 35, 43, 0.08);
 }
 
 .strategy-toggle button[aria-pressed="true"] span {
-  color: var(--brand-purple);
+  color: var(--brand-accent);
 }
 
 label {
@@ -396,9 +407,9 @@ select:hover {
 
 input:focus,
 select:focus {
-  border-color: var(--brand-purple);
+  border-color: #e85313;
   background: #fff;
-  box-shadow: 0 0 0 4px rgba(88, 35, 243, 0.1);
+  box-shadow: 0 0 0 4px rgba(232, 83, 19, 0.11);
 }
 
 .field-row {
@@ -412,31 +423,11 @@ select:focus {
   grid-template-columns: 1fr 1fr;
 }
 
-.parameter-info {
-  display: flex;
+.allocation-inputs {
+  display: grid;
   min-width: 0;
-  height: 67px;
-  padding: 11px 14px;
-  border: 1px solid var(--gray-20);
-  border-radius: 12px;
-  flex-direction: column;
-  justify-content: center;
-  gap: 6px;
-  color: var(--gray-50);
-  background: linear-gradient(105deg, #f5f5fa, #fff);
-}
-
-.parameter-info span {
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.parameter-info strong {
-  color: var(--brand-black);
-  font-size: 13px;
-  font-weight: 500;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 
 .submit-button,
@@ -454,16 +445,16 @@ select:focus {
   width: 100%;
   height: 54px;
   margin-top: 22px;
-  color: #fff;
-  background: var(--brand-purple);
-  box-shadow: 0 10px 24px rgba(88, 35, 243, 0.2);
+  color: var(--brand-black);
+  background: var(--primary-gradient);
+  box-shadow: 0 10px 24px rgba(232, 83, 19, 0.18);
 }
 
 .submit-button:hover:not(:disabled),
 .primary-button:hover:not(:disabled) {
   transform: translateY(-2px);
-  background: #6a4dff;
-  box-shadow: 0 10px 25px rgba(88, 35, 243, 0.22);
+  background: linear-gradient(100deg, #ff63d0, #ffa480 58%, #ffda79 115%);
+  box-shadow: 0 10px 25px rgba(232, 83, 19, 0.22);
 }
 
 .submit-button:disabled,
@@ -511,14 +502,14 @@ select:focus {
   color: inherit;
   font-weight: 600;
   text-decoration: underline;
-  text-decoration-color: rgba(88, 35, 243, 0.35);
+  text-decoration-color: rgba(209, 66, 0, 0.35);
   text-underline-offset: 3px;
 }
 
 .explorer-link {
   display: inline-block;
   margin-top: 11px;
-  color: var(--brand-purple);
+  color: var(--brand-accent);
   font-size: 12px;
 }
 
@@ -580,8 +571,8 @@ select:focus {
 }
 
 .filter-tabs button.active {
-  color: #fff;
-  background: var(--brand-purple);
+  color: var(--brand-black);
+  background: var(--primary-gradient);
 }
 
 .role-badges {
@@ -597,8 +588,8 @@ select:focus {
 }
 
 .role-badge.investor {
-  color: #3a00a6;
-  background: #e5e5ff;
+  color: #850047;
+  background: #ffdbf9;
 }
 
 .role-badge.admin {
@@ -608,8 +599,8 @@ select:focus {
 
 .vault-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
+  grid-template-columns: 1fr;
+  gap: 13px;
   padding-bottom: 110px;
 }
 
@@ -630,7 +621,7 @@ select:focus {
   right: 0;
   left: 0;
   height: 4px;
-  background: var(--purple-gradient);
+  background: var(--sunset-gradient);
   content: "";
 }
 
@@ -640,8 +631,8 @@ select:focus {
 
 .vault-card:hover {
   transform: translateY(-5px);
-  border-color: rgba(88, 35, 243, 0.24);
-  box-shadow: 0 26px 64px rgba(88, 35, 243, 0.12);
+  border-color: rgba(232, 83, 19, 0.24);
+  box-shadow: 0 26px 64px rgba(232, 83, 19, 0.12);
 }
 
 .vault-card h2 {
@@ -700,6 +691,129 @@ select:focus {
   font-weight: 600;
 }
 
+.vault-ranking {
+  display: flex;
+  min-height: 82px;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid var(--line);
+  flex-direction: column;
+  gap: 5px;
+}
+
+.rank-badge {
+  display: inline-flex;
+  min-width: 52px;
+  height: 48px;
+  padding: 0 10px;
+  border-radius: 15px;
+  align-items: center;
+  justify-content: center;
+  color: #8c3100;
+  background: #ffe4d6;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+.vault-ranking small {
+  color: var(--gray-50);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.leaderboard-row {
+  display: grid;
+  min-height: 150px;
+  padding: 24px 26px;
+  grid-template-columns: 82px minmax(230px, 1fr) minmax(390px, 1.35fr) 24px;
+  align-items: center;
+  gap: 24px;
+  background: #fff;
+}
+
+.leaderboard-row h2 {
+  overflow: hidden;
+  margin: 14px 0 8px;
+  font-size: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vault-overview {
+  min-width: 0;
+}
+
+.vault-overview .vault-card-topline {
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.vault-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  color: var(--gray-50);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.vault-row-meta .pair-line {
+  padding-left: 15px;
+  border-left: 1px solid var(--line);
+  color: var(--brand-black);
+  font-size: 12px;
+}
+
+.leaderboard-row .card-metrics {
+  margin: 0;
+  padding: 0 0 0 24px;
+  border-top: 0;
+  border-left: 1px solid var(--line);
+}
+
+.leaderboard-row .card-metrics > div:first-child strong {
+  font-size: 22px;
+  letter-spacing: -0.03em;
+}
+
+.vault-row-arrow {
+  color: var(--brand-accent);
+  font-size: 20px;
+  transition: transform 180ms;
+}
+
+.leaderboard-row:hover .vault-row-arrow {
+  transform: translate(3px, -3px);
+}
+
+.vault-card.rank-1 {
+  border-color: rgba(255, 137, 93, 0.55);
+  box-shadow: 0 24px 64px rgba(232, 83, 19, 0.14);
+}
+
+.vault-card.rank-1::before {
+  height: 6px;
+  background: var(--primary-gradient);
+}
+
+.rank-1 .rank-badge {
+  color: var(--brand-black);
+  background: var(--primary-gradient);
+}
+
+.rank-2 .rank-badge {
+  color: #8a5100;
+  background: #fff0c7;
+}
+
+.rank-3 .rank-badge {
+  color: #850047;
+  background: #ffdbf9;
+}
+
 .empty-state {
   padding: 50px;
   border: 1px dashed var(--gray-30);
@@ -749,17 +863,8 @@ select:focus {
   background: rgba(255, 255, 255, 0.94);
 }
 
-.metric-grid article:nth-child(2) {
-  background: var(--purple-gradient);
-}
-
-.metric-grid article:nth-child(5) {
-  background: var(--warm-gradient);
-}
-
 .metric-grid article:last-child:nth-child(3n + 1) {
   grid-column: 1 / -1;
-  background: var(--magenta-gradient);
 }
 
 .metric-grid strong {
@@ -811,18 +916,18 @@ select:focus {
 }
 
 .primary-button {
-  color: #fff;
-  background: var(--brand-purple);
+  color: var(--brand-black);
+  background: var(--primary-gradient);
 }
 
 .secondary-button {
-  color: var(--brand-purple);
-  background: #e5e5ff;
+  color: #8c3100;
+  background: #ffe4d6;
 }
 
 .secondary-button:hover:not(:disabled) {
   transform: translateY(-2px);
-  background: #d3d3ff;
+  background: #ffd2bd;
 }
 
 .primary-button.full,
@@ -923,19 +1028,12 @@ select:focus {
   padding: 28px;
   border: 1px solid var(--line);
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.76);
-}
-
-.steps article:nth-child(2) {
-  background: var(--purple-gradient);
-}
-
-.steps article:nth-child(3) {
-  background: var(--warm-gradient);
+  background: #fff;
+  box-shadow: 0 14px 38px rgba(35, 35, 43, 0.06);
 }
 
 .steps span {
-  color: var(--brand-purple);
+  color: var(--brand-accent);
   font-size: 11px;
   font-weight: 600;
 }
@@ -977,6 +1075,23 @@ select:focus {
   .vault-layout {
     grid-template-columns: 1fr;
   }
+
+  .leaderboard-row {
+    grid-template-columns: 70px minmax(0, 1fr) 20px;
+  }
+
+  .leaderboard-row .card-metrics {
+    grid-column: 2;
+    padding: 18px 0 0;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .vault-row-arrow {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+
 }
 
 @media (max-width: 700px) {
@@ -1009,6 +1124,37 @@ select:focus {
   .strategy-form,
   .panel {
     padding: 22px;
+  }
+
+  .leaderboard-row {
+    padding: 20px;
+    grid-template-columns: 54px minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .vault-ranking {
+    min-height: 72px;
+  }
+
+  .rank-badge {
+    min-width: 44px;
+    height: 42px;
+    border-radius: 13px;
+    font-size: 17px;
+  }
+
+  .leaderboard-row .card-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .leaderboard-row .card-metrics > div:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .vault-row-arrow {
+    position: absolute;
+    right: 20px;
+    bottom: 20px;
   }
 
   .field-row {
