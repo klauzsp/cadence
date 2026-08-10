@@ -8,6 +8,10 @@
   <strong>The open strategy layer for onchain investing.</strong>
 </p>
 
+<p align="center">
+  <img src="screenshots/process.png" alt="How Cadence turns investment strategies into automated onchain vaults" width="900" />
+</p>
+
 Investment strategies have traditionally been restrictive. Institutions decide which products get created, platforms decide which products get listed, and most investors can only choose from the finished menu.
 
 **Cadence opens up the strategy layer.** Any wallet can turn an investment idea into a public, investable vault on Monad. Other users can discover it, deposit capital and receive shares representing their ownership. Automation then runs the published rules transparently onchain.
